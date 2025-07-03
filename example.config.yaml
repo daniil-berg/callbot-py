@@ -1,0 +1,63 @@
+# Server related settings.
+server:
+  # Local IP the webserver should bind to.
+  host: 127.0.0.1
+  # Local port the webserver should bind to.
+  port: 8000
+  # Public facing base URL of the application.
+  public_base_url:
+
+# Database settings.
+db:
+  # Database backend/driver name (e.g. "postgresql+psycopg2").
+  driver: "sqlite+aiosqlite"
+  # Username for authentication.
+  username:
+  # Database password for authentication.
+  password:
+  # Resolvable name or IP address of the host.
+  host:
+  # Port number.
+  port:
+  # Name of the database.
+  name:
+  # Query parameters to pass to the dialect and/or the DBAPI when connecting.
+  query:
+
+# Settings related to the Twilio account.
+twilio:
+  # SID of the account to use.
+  account_sid:
+  # API authentication token to provide to Twilio.
+  auth_token:
+  # Phone number to use for outbound calls.
+  # Must be in the E.164 format AND enclosed in quotes!
+  phone_number:
+
+# Settings related to the OpenAI realtime API.
+openai:
+  # API authentication token to provide to OpenAI.
+  api_key:
+  # First prompt to send to the model for it to initiate the conversation.
+  # Instead of a text prompt, this may be a path to a text file containing that prompt.
+  init_conversation_prompt:
+  # Options to set for an entire realtime session.
+  session:
+    # Names of modules that register function definitions to provide to the model as tools.
+    function_plugins:
+    # Specific model snapshot to use.
+    model: gpt-4o-realtime-preview-2025-06-03
+    # System instructions to the model before the start of the conversation.
+    # Instead of a text prompt, this may be a path to a text file containing that prompt.
+    instructions:
+    # Speed of the model's spoken response. Must be between 0.25 and 1.5.
+    speed: 1.0
+    # Sampling temperature for the model. Must be between 0.6 and 1.2.
+    temperature: 0.8
+    # Voice the model shall use to respond.
+    # Options: "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"
+    voice: sage
+
+# Miscellaneous options.
+misc:
+  log_level: INFO

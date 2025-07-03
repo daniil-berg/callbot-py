@@ -1,0 +1,202 @@
+#####################
+# Python packaging: #
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "callbot"
+description = "Extensible callbot using the OpenAI Realtime API and Twilio."
+readme = "README.md"
+authors = [
+    { name = "Daniel Fainberg", email = "mail@daniil.fajnberg.de" },
+]
+maintainers = [
+    { name = "Daniel Fainberg", email = "mail@daniil.fajnberg.de" },
+]
+requires-python = ">=3.11, <4.0"
+keywords = [
+    "bot",
+    "callbot",
+    "phone",
+    "openai",
+    "twilio",
+    "websockets",
+]
+license = { text = "Apache Software License Version 2.0" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: Apache Software License",
+]
+dynamic = ["version"]
+dependencies = [
+    "aiosqlite",
+    "annotated-types",
+    "caseutil",
+    "email-validator",
+    "fastapi[standard]",
+    "openai",
+    "pydantic>=2",
+    "pydantic-extra-types[phonenumbers]",
+    "pydantic-settings>=2",
+    "sqlalchemy[asyncio]",
+    "sqlmodel",
+    "twilio",
+    "uvicorn",
+    "websockets",
+]
+
+[project.optional-dependencies]
+full = [
+
+]
+dev = [
+    "mypy",
+    "ruff",
+    "types-PyYAML",
+]
+
+[project.urls]
+
+[project.scripts]
+callbot = "callbot.cli:main"
+
+[tool.hatch.version]
+path = "src/callbot/__about__.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+#########################
+# Virtual environments: #
+
+[tool.hatch.envs.default]
+installer = "uv"
+extra-dependencies = []
+features = [
+  "dev",
+]
+
+[tool.uv.pip]
+annotation-style = "line"
+
+[tool.hatch.envs.default.scripts]
+cache-clear = "rm -rf .cache/"
+check = "ruff check {args:src/}"
+fix = "check --fix"
+format = "ruff format {args:src/}"
+format-diff = "format --diff"
+lint = [
+    "check",
+    "format-diff",
+    "types",
+]
+types = "mypy {args:src/}"
+
+[tool.hatch.envs.hatch-static-analysis]
+config-path = "none"  # explicitly use custom ruff config below
+
+[tool.hatch.envs.hatch-static-analysis.scripts]
+# The following are essentially duplicates of the `check`, `fix`, `format`, and `format-diff` scripts
+# from the default environment defined above.
+# They serve as a convenient shortcut via the built in `hatch fmt` command.
+format-check = "format-fix --diff"
+format-fix = "ruff format {args:src/}"
+lint-check = "ruff check {args:src/}"
+lint-fix = "lint-check --fix"
+
+
+#########################
+# Static type checking: #
+
+[tool.mypy]
+cache_dir = ".cache/mypy"
+files = [
+    "src/",
+]
+warn_unused_configs = true
+strict = true
+show_error_codes = true
+plugins = [
+    "pydantic.mypy",
+]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+
+###############################
+# Linting and style checking: #
+
+[tool.ruff]
+cache-dir = ".cache/ruff"
+show-fixes = true
+line-length = 80
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+    "F",    # pyflakes
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "N",    # pep8-naming
+#    "D",    # pydocstyle
+#    "ANN",  # flake8-annotations
+    "S",    # flake8-bandit
+#    "FBT",  # flake8-boolean-trap
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C",    # flake8-comprehensions
+    "PIE",  # flake8-pie
+    "T20",  # flake8-print
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "TD",   # flake8-todos
+    "TCH",  # flake8-type-checking
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate
+    "PL",   # pylint
+#    "TRY",  # tryceratops
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",  # Line too long -> will be handled by auto-formatting later
+    "D203",  # 1 blank line required before class docstring -> D211 is better
+    "D212",  # Multi-line docstring summary should start at the first line -> D213 is better
+    "D401",  # First line of docstring should be in imperative mood -> no, it shouldn't
+    "D407",  # Missing dashed underline after section -> different docstring style
+    "N818",  # Exception name {name} should be named with an Error suffix -> no, it shouldn't
+    "A003",  # Class attribute {name} is shadowing a Python builtin -> namespaces make this OK
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/**/__init__.py" = [
+    "A001",  # Variable {name} is shadowing a Python builtin
+]
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
+[tool.ruff.lint.pep8-naming]
+# Allow Pydantic's `@field_validator` decorator to trigger class method treatment.
+classmethod-decorators = [
+    "classmethod",
+    "pydantic.field_validator",
+    "pydantic.functional_validators.field_validator",
+]
+
+[tool.ruff.lint.pylint]
+max-args = 8
