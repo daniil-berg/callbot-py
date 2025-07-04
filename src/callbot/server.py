@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, WebSocket, status
 from fastapi.responses import JSONResponse, Response
+from loguru import logger as log
 # TODO: Migrate to httpx-ws
 from websockets import connect as ws_connect
 
@@ -37,7 +38,6 @@ async def root() -> StrDict:
 @app.websocket("/stream")
 async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
     """Handle WebSocket connections between Twilio and OpenAI."""
-    print("Client connected")
     await twilio_ws.accept()
     settings = Settings()
     async with ws_connect(
@@ -58,13 +58,13 @@ async def make_call(
 ) -> StrDict:
     results = await session.exec(Contact.select_by_phone(phone_number))
     if not (contact := results.first()):
-        print(f"No contact with number {phone_number}")
+        log.info(f"No contact with number {phone_number}")
         response.status_code = status.HTTP_404_NOT_FOUND
         return {"status": "error", "message": "Contact not found"}
     caller = Caller()
-    print(f"Calling {phone_number}: {contact.model_dump_json(exclude_defaults=True)}")
+    log.info(f"Calling {phone_number}: {contact.model_dump_json(exclude_defaults=True)}")
     sid = await caller(contact)
-    print(f"Call SID for {phone_number}: {sid}")
+    log.debug(f"Call SID for {phone_number}: {sid}")
     return {"status": "ok", "sid": sid}
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import uvicorn
 
 from callbot.contacts import import_contacts
+from callbot.misc.logging import configure_logging
 from callbot.server import app
 from callbot.settings import Settings
 
@@ -20,6 +21,8 @@ def serve(args: Namespace) -> None:
         app,
         host=str(settings.server.host),
         port=settings.server.port,
+        log_config=None,
+        log_level=None,
     )
 
 
@@ -54,7 +57,7 @@ def main() -> None:
         type=Path,
     )
     parser_contacts.set_defaults(cmd=contacts)
-
+    configure_logging()
     args = parser.parse_args()
     args.cmd(args)
 

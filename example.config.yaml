@@ -58,7 +58,22 @@ openai:
     # Options: "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"
     voice: sage
 
+# Logging configuration.
+logging:
+  # Global log level.
+  # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+  level: INFO
+  # Format for log messages.
+  # See: https://loguru.readthedocs.io/en/stable/api/logger.html#record
+  # Also see: https://loguru.readthedocs.io/en/stable/api/logger.html#color
+  format: "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
+  # Explicit logging activation/deactivation by module name.
+  # Keys should be module names; values should be booleans.
+  modules:
+    aiosqlite: false
+    sqlalchemy.pool: false
+
 # Miscellaneous options.
 misc:
-  # If provided, phone number not in international format can be converted to E164 format assuming this region code.
+  # If provided, phone numbers not in international format can be converted to that format assuming this region code.
   default_phone_region:

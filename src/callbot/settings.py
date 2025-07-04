@@ -4,7 +4,7 @@ from importlib import import_module
 from ipaddress import IPv4Address
 from logging import CRITICAL, INFO, getLevelNamesMapping
 from pathlib import Path
-from typing import Annotated, Literal, TypeAlias, ClassVar, Any
+from typing import Annotated, Any, ClassVar, Literal, TypeAlias
 
 import yaml
 from annotated_types import Ge, Le
@@ -78,10 +78,13 @@ def shorten_string(max_length: int) -> Callable[[str], str]:
 
 NoneAsEmptyStr = BeforeValidator(lambda v: "" if v is None else v)
 NoneAsEmptyList = BeforeValidator(lambda v: [] if v is None else v)
+NoneAsEmptyDict = BeforeValidator(lambda v: {} if v is None else v)
 
+DBURLQuery = Annotated[dict[str, list[str] | str], NoneAsEmptyDict]
 FloatOpenAISpeed = Annotated[float, Ge(0.25), Le(1.5)]
 FloatOpenAITemperature = Annotated[float, Ge(0.6), Le(1.2)]
 IntLogLevel = Annotated[PositiveInt, Le(CRITICAL), WrapValidator(log_level_num)]
+LogModules = Annotated[dict[str, bool], NoneAsEmptyDict]
 OpenAIFunctionPlugin = Annotated[str, AfterValidator(ensure_module_imported)]
 OpenAIFunctionPlugins = Annotated[list[OpenAIFunctionPlugin], NoneAsEmptyList]
 OpenAIVoice: TypeAlias = Literal[
@@ -145,8 +148,7 @@ class DBSettings(SettingsSubModel):
     host: str | None = None
     port: int | None = None
     name: str | None = None
-    query: dict[str, list[str] | str] | None = None
-    echo: bool = False
+    query: DBURLQuery = {}
 
     @property
     def url(self) -> URL:
@@ -157,7 +159,7 @@ class DBSettings(SettingsSubModel):
             host=self.host,
             port=self.port,
             database=self.name,
-            query=self.query if self.query else {},
+            query=self.query,
         )
 
 
@@ -238,9 +240,14 @@ class ScheduleSettings(SettingsSubModel):
     retry_delay_hours: PositiveInt = 4
 
 
+class LoggingSettings(SettingsSubModel):
+    level: IntLogLevel = INFO
+    format: str = "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
+    modules: LogModules = {"aiosqlite": False, "sqlalchemy.pool": False}
+
+
 class MiscellaneousSettings(SettingsSubModel):
     default_phone_region: str | None = None
-    log_level: IntLogLevel = INFO
     mode: Literal["testing", "production"] = "testing"
 
 
@@ -263,6 +270,7 @@ class Settings(
     twilio: TwilioSettings = TwilioSettings()
     openai: OpenAISettings = OpenAISettings()
     schedule: ScheduleSettings = ScheduleSettings()
+    logging: LoggingSettings = LoggingSettings()
     misc: MiscellaneousSettings = MiscellaneousSettings()
 
     @classmethod

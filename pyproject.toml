@@ -41,6 +41,7 @@ dependencies = [
     "caseutil",
     "email-validator",
     "fastapi[standard]",
+    "loguru",
     "openai",
     "pydantic>=2",
     "pydantic-extra-types[phonenumbers]",

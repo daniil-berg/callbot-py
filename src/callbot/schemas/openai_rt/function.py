@@ -4,6 +4,7 @@ import json
 from typing import Any, ClassVar, Literal, TYPE_CHECKING
 
 from caseutil import to_snake
+from loguru import logger as log
 from openai.types.beta.realtime.session_update_event import SessionTool as _SessionTool
 from openai.types.beta.realtime.realtime_response import RealtimeResponse
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -63,7 +64,7 @@ class Function[ArgT: Arguments](SessionTool):
         for output in response.output:
             if output.type != "function_call" or output.name is None:
                 continue
-            print(f"Function call detected: {output.name}")
+            log.debug(f"Function call detected: {output.name}")
             if (func_cls := Function.registry.get(output.name)) is None:
                 continue
             if output.arguments is None:

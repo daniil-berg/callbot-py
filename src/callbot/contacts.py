@@ -1,6 +1,7 @@
 from csv import DictReader
 from pathlib import Path
 
+from loguru import logger as log
 from pydantic import ValidationError
 from sqlmodel import and_, col, or_, select
 
@@ -17,7 +18,7 @@ async def import_contacts(path: Path) -> None:
                 try:
                     contact = Contact.model_validate(row)
                 except ValidationError as validation_error:
-                    print(f"Validation error in line {idx}: {validation_error.json()}")
+                    log.error(f"Validation error in line {idx}: {validation_error.json()}")
                 else:
                     await import_contact(session, contact)
 
@@ -33,8 +34,8 @@ async def import_contact(db_session: Session, contact: Contact) -> None:
     results = await db_session.exec(select(ContactDB).where(condition))
     contact_json = contact.model_dump_json(exclude_defaults=True)
     if results.first() is None:
-        print(f"Importing: {contact_json}")
+        log.info(f"Importing: {contact_json}")
         db_session.add(contact.to_db())
         await db_session.commit()
     else:
-        print(f"Skipping existing phone/email: {contact_json}")
+        log.debug(f"Skipping existing phone/email: {contact_json}")
