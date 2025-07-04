@@ -49,6 +49,7 @@ dependencies = [
     "sqlalchemy[asyncio]",
     "sqlmodel",
     "twilio",
+    "typer",
     "uvicorn",
     "websockets",
 ]
@@ -66,7 +67,7 @@ dev = [
 [project.urls]
 
 [project.scripts]
-callbot = "callbot.cli:main"
+callbot = "callbot.__main__:main"
 
 [tool.hatch.version]
 path = "src/callbot/__about__.py"
