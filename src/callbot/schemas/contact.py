@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import BeforeValidator, EmailStr
+from pydantic import BeforeValidator, EmailStr, validate_call
 from sqlmodel import Field, SQLModel, col, select
 from sqlmodel.sql.expression import SelectOfScalar
 
@@ -27,8 +27,9 @@ class Contact(SQLModel):
     def to_db(self) -> "ContactDB":
         return ContactDB.model_validate(self)
 
-    @classmethod
-    def select_by_phone(cls, phone: str) -> SelectOfScalar["ContactDB"]:
+    @staticmethod
+    @validate_call
+    def select_by_phone(phone: Phone) -> SelectOfScalar["ContactDB"]:
         condition = col(ContactDB.phone) == phone
         return select(ContactDB).where(condition)
 
