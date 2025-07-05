@@ -1,6 +1,5 @@
 from collections.abc import Callable
 from datetime import time
-from importlib import import_module
 from ipaddress import IPv4Address
 from logging import CRITICAL, INFO, getLevelNamesMapping
 from pathlib import Path
@@ -9,7 +8,6 @@ from typing import Annotated, Any, ClassVar, Literal, TypeAlias
 import yaml
 from annotated_types import Ge, Le
 from pydantic import (
-    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -55,11 +53,6 @@ def log_level_num(v: object, handler: ValidatorFunctionWrapHandler) -> int:
         raise err
 
 
-def ensure_module_imported(module_name: str) -> str:
-    import_module(module_name)
-    return module_name
-
-
 def valid_file_path(v: object, handler: ValidatorFunctionWrapHandler) -> object:
     path: Path = handler(v)
     try:
@@ -85,8 +78,6 @@ FloatOpenAISpeed = Annotated[float, Ge(0.25), Le(1.5)]
 FloatOpenAITemperature = Annotated[float, Ge(0.6), Le(1.2)]
 IntLogLevel = Annotated[PositiveInt, Le(CRITICAL), WrapValidator(log_level_num)]
 LogModules = Annotated[dict[str, bool], NoneAsEmptyDict]
-OpenAIFunctionPlugin = Annotated[str, AfterValidator(ensure_module_imported)]
-OpenAIFunctionPlugins = Annotated[list[OpenAIFunctionPlugin], NoneAsEmptyList]
 OpenAIVoice: TypeAlias = Literal[
     "alloy",
     "ash",
@@ -171,7 +162,6 @@ class TwilioSettings(SettingsSubModel):
 
 
 class OpenAISessionOptions(SettingsSubModel):
-    function_plugins: OpenAIFunctionPlugins = []
     instructions: Annotated[
         PathFileExists | Str128 | None,
         Field(union_mode="left_to_right"),

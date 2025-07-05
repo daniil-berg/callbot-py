@@ -43,8 +43,6 @@ openai:
   init_conversation_prompt:
   # Options to set for an entire realtime session.
   session:
-    # Names of modules that register function definitions to provide to the model as tools.
-    function_plugins:
     # System instructions to the model before the start of the conversation.
     # Instead of a text prompt, this may be a path to a text file containing that prompt.
     instructions:

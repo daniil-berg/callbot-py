@@ -69,6 +69,10 @@ dev = [
 [project.scripts]
 callbot = "callbot.__main__:main"
 
+[project.entry-points.'callbot.cli']
+
+[project.entry-points.'callbot.functions']
+
 [tool.hatch.version]
 path = "src/callbot/__about__.py"
 

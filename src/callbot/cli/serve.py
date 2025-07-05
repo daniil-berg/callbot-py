@@ -1,3 +1,4 @@
+from importlib.metadata import entry_points
 from typing import Annotated
 
 import uvicorn
@@ -33,6 +34,8 @@ def serve(
         settings.server.host = host  # type: ignore[assignment]
     if port is not None:
         settings.server.port = port
+    for plugin in entry_points(group="callbot.functions"):
+        plugin.load()
     uvicorn.run(
         server.app,
         host=str(settings.server.host),
