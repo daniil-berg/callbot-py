@@ -69,7 +69,8 @@ logging:
   # Keys should be module names; values should be booleans.
   modules:
     aiosqlite: false
-    sqlalchemy.pool: false
+    sqlalchemy: false
+    websockets: false
 
 # Miscellaneous options.
 misc:

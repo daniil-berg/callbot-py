@@ -233,7 +233,11 @@ class ScheduleSettings(SettingsSubModel):
 class LoggingSettings(SettingsSubModel):
     level: IntLogLevel = INFO
     format: str = "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
-    modules: LogModules = {"aiosqlite": False, "sqlalchemy.pool": False}
+    modules: LogModules = {
+        "aiosqlite": False,
+        "sqlalchemy": False,
+        "websockets": False,
+    }
 
 
 class MiscellaneousSettings(SettingsSubModel):
