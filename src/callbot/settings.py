@@ -18,9 +18,11 @@ from pydantic import (
     PositiveInt,
     SecretStr,
     ValidationError,
+    ValidationInfo,
     ValidatorFunctionWrapHandler,
     WrapSerializer,
     WrapValidator,
+    field_validator,
 )
 from pydantic._internal._model_construction import ModelMetaclass
 from pydantic.main import IncEx
@@ -204,6 +206,12 @@ class OpenAISettings(SettingsSubModel):
     ]
     session: OpenAISessionOptions = OpenAISessionOptions()
 
+    @field_validator("session", mode="before")
+    def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
+        if v is None:
+            return cls.model_fields[info.field_name].get_default()
+        return v
+
     @property
     def realtime_stream_url(self) -> str:
         return f"{self.REALTIME_BASE_URL}?model={self.session.model}"
@@ -266,6 +274,12 @@ class Settings(
     schedule: ScheduleSettings = ScheduleSettings()
     logging: LoggingSettings = LoggingSettings()
     misc: MiscellaneousSettings = MiscellaneousSettings()
+
+    @field_validator("*", mode="before")
+    def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
+        if v is None:
+            return cls.model_fields[info.field_name].get_default()
+        return v
 
     @classmethod
     def settings_customise_sources(
