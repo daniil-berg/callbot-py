@@ -56,14 +56,13 @@ async def make_call(
     session: SessionDep,
     response: Response,
 ) -> StrDict:
-    results = await session.exec(Contact.select_by_phone(phone_number))
-    if not (contact := results.first()):
+    caller = Caller(pool=False)
+    try:
+        sid = await caller.get_contact_and_call(phone_number, session)
+    except ValueError as error:
         log.info(f"No contact with number {phone_number}")
         response.status_code = status.HTTP_404_NOT_FOUND
-        return {"status": "error", "message": "Contact not found"}
-    caller = Caller()
-    log.info(f"Calling {phone_number}: {contact.model_dump_json(exclude_defaults=True)}")
-    sid = await caller(contact)
+        return {"status": "error", "message": str(error)}
     log.debug(f"Call SID for {phone_number}: {sid}")
     return {"status": "ok", "sid": sid}
 
