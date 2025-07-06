@@ -8,6 +8,7 @@ from loguru import logger as log
 # TODO: Migrate to httpx-ws
 from websockets import connect as ws_connect
 
+from callbot.auth.jwt import JWT
 from callbot.call_manager import CallManager
 from callbot.caller import Caller
 from callbot.db import EngineWrapper as DBEngine, Session
@@ -17,6 +18,7 @@ from callbot.types import StrDict
 
 
 SessionDep = Annotated[Session, Depends(DBEngine.yield_session)]
+JWTDep = Depends(JWT.decode_and_invalidate)
 
 
 @asynccontextmanager
@@ -38,6 +40,9 @@ async def root() -> StrDict:
 @app.websocket("/stream")
 async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
     """Handle WebSocket connections between Twilio and OpenAI."""
+    # TODO: The OpenAI websocket should be opened after the Twilio start message
+    #       passes authentication. The entire call manager initialization logic
+    #       needs to be reworked.
     await twilio_ws.accept()
     settings = Settings()
     async with ws_connect(
@@ -49,8 +54,11 @@ async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
         await call_manager.run()
 
 
-# TODO: Add authentication.
-@app.post("/call/{phone_number}", response_class=JSONResponse)
+@app.post(
+    "/call/{phone_number}",
+    dependencies=[JWTDep],
+    response_class=JSONResponse,
+)
 async def make_call(
     phone_number: Phone,
     session: SessionDep,
@@ -67,8 +75,7 @@ async def make_call(
     return {"status": "ok", "sid": sid}
 
 
-# TODO: Add authentication.
-@app.post("/contacts")
+@app.post("/contacts", dependencies=[JWTDep])
 async def add_contact(contact: Contact, session: SessionDep) -> Contact:
     contact_db = contact.to_db()
     session.add(contact_db)

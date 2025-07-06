@@ -7,6 +7,7 @@ from loguru import logger as log
 from pydantic import ValidationError
 from websockets.asyncio.client import ClientConnection
 
+from callbot.auth.jwt import JWT
 from callbot.exceptions import TwilioWebsocketStopReceived
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
@@ -124,6 +125,7 @@ class CallManager:
         try:
             async for text in self.twilio_websocket.iter_text():
                 await self.handle_twilio_message(text)
+        # TODO: Handle `AuthException`.
         except (TwilioWebsocketStopReceived, WebSocketDisconnect):
             log.info(f"Twilio disconnected, stream {self.stream_sid} stopped")
             # TODO: Handle `ConnectionClosed`.
@@ -141,6 +143,9 @@ class CallManager:
                 log.info(f"🔌 Connected to Twilio - {message}")
             case TwilioInboundStart():
                 # TODO: Validate account and maybe stream SID!
+                token = message.start.customParameters.get("token", "")
+                _jwt = JWT.decode_and_invalidate(token)
+                log.info(f"🔐 Connection secure")
                 self.stream_sid = message.start.streamSid
                 self.contact_info = Contact.model_validate(
                     message.start.customParameters

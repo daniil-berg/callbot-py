@@ -7,6 +7,7 @@ from twilio.rest import Client  # type: ignore[import-untyped]
 from twilio.http.async_http_client import AsyncTwilioHttpClient  # type: ignore[import-untyped]
 from twilio.twiml.voice_response import Connect, Stream, VoiceResponse  # type: ignore[import-untyped]
 
+from callbot.auth.jwt import JWT
 from callbot.db import EngineWrapper as DBEngine, Session
 from callbot.schemas.contact import Contact
 from callbot.settings import Settings
@@ -54,6 +55,7 @@ class Caller:
         stream = Stream(url=str(self.endpoint))
         for key, value in contact.model_dump(exclude_defaults=True).items():
             stream.parameter(name=key, value=str(value))
+        stream.parameter(name="token", value=JWT.generate())
         connect.nest(stream)
         twiml.append(connect)
         log.info(f"Calling {contact.phone}: {contact.model_dump_json(exclude_defaults=True)}")

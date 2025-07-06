@@ -36,6 +36,7 @@ from pydantic_settings import (
 )
 from sqlalchemy import URL
 
+from callbot.auth.algorithm import Algorithm, DEFAULT_ALGORITHM
 from callbot.misc.singleton import Singleton
 from callbot.types import StrDict
 
@@ -128,10 +129,19 @@ class SettingsSubModel(BaseModel):
     )
 
 
+class AuthSettings(BaseSettings):
+    secret: str = "secret"
+    alg: Algorithm = DEFAULT_ALGORITHM
+    iss: str | None = None
+    aud: str | None = None
+    expiration_seconds: int = 15 * 60
+
+
 class ServerSettings(SettingsSubModel):
     host: IPvAnyAddress = IPv4Address("127.0.0.1")
     port: PositiveInt = 8000
     public_base_url: HttpUrl | None = None
+    auth: AuthSettings = AuthSettings()
 
 
 class DBSettings(SettingsSubModel):
@@ -208,6 +218,7 @@ class OpenAISettings(SettingsSubModel):
 
     @field_validator("session", mode="before")
     def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
+        assert info.field_name is not None
         if v is None:
             return cls.model_fields[info.field_name].get_default()
         return v
@@ -277,6 +288,7 @@ class Settings(
 
     @field_validator("*", mode="before")
     def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
+        assert info.field_name is not None
         if v is None:
             return cls.model_fields[info.field_name].get_default()
         return v
