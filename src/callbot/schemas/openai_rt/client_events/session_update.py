@@ -7,10 +7,6 @@ from callbot.settings import FloatOpenAISpeed, FloatOpenAITemperature, Settings
 from callbot.schemas.openai_rt.function import Arguments, Function
 
 
-class ClientSecret(base.SessionClientSecret):
-    expires_at: int  # type: ignore[assignment]
-
-
 class SessionInputAudioTranscription(base.SessionInputAudioTranscription):
     model: Literal["gpt-4o-transcribe", "gpt-4o-mini-transcribe", "whisper-1"] | None = None
 
@@ -23,7 +19,6 @@ class SessionTurnDetection(base.SessionTurnDetection):
 
 
 class Session(base.Session):
-    client_secret: ClientSecret | None = None
     input_audio_transcription: SessionInputAudioTranscription | None = None
     max_response_output_tokens: Annotated[int, Field(ge=1, le=4096)] | Literal["inf"] | None = None
     modalities: tuple[Literal["text", "audio"]] | tuple[Literal["text"], Literal["audio"]] | tuple[Literal["audio"], Literal["text"]] | None = None  # type: ignore[assignment]
