@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from websockets.asyncio.client import ClientConnection
 
 from callbot.auth.jwt import JWT
-from callbot.exceptions import TwilioWebsocketStopReceived
+from callbot.exceptions import EndCall, TwilioWebsocketStopReceived
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -184,6 +184,8 @@ class CallManager:
                 assert isinstance(text, str)
                 await self.handle_openai_message(text)
         except Exception as e:
+            if isinstance(e, EndCall):
+                await self.twilio_websocket.close()
             log.exception(f"Error in openai_listen: {e}")
 
     async def handle_openai_message(self, text: str) -> None:
@@ -228,8 +230,11 @@ class CallManager:
                     ),
                     return_exceptions=True,
                 )
-                if isinstance(exc, BaseException):
-                    log.debug(f"Error in function '{function.get_name()}': {exc}")
+                if isinstance(exc, Exception):
+                    if isinstance(exc, EndCall):
+                        log.info(f"'{function.get_name()}' ending call: {exc}")
+                        raise exc
+                    log.debug(f"Error in '{function.get_name()}': {exc}")
 
     async def _handle_speech_started_event(self) -> None:
         log.debug("Handling speech started event.")

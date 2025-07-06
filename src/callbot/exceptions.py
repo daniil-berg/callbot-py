@@ -10,6 +10,10 @@ class TwilioWebsocketStopReceived(CallbotException):
     pass
 
 
+class EndCall(CallbotException):
+    pass
+
+
 class AuthException(HTTPException, CallbotException):
     def __init__(
         self,
