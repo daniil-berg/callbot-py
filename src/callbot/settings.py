@@ -25,6 +25,7 @@ from pydantic import (
     field_validator,
 )
 from pydantic._internal._model_construction import ModelMetaclass
+from pydantic.fields import FieldInfo
 from pydantic.main import IncEx
 from pydantic_core.core_schema import SerializerFunctionWrapHandler
 from pydantic_extra_types.phone_numbers import PhoneNumberValidator
@@ -38,6 +39,7 @@ from sqlalchemy import URL
 
 from callbot.auth.algorithm import Algorithm, DEFAULT_ALGORITHM
 from callbot.misc.singleton import Singleton
+from callbot.misc.util import is_subclass
 from callbot.types import StrDict
 
 
@@ -104,15 +106,13 @@ SecretStrNoneAsEmpty = Annotated[SecretStr, NoneAsEmptyStr]
 def workaround_shorten_128(
     value: object,
     handler: SerializerFunctionWrapHandler,
-) -> str:
+) -> object:
     """
     https://github.com/pydantic/pydantic/issues/6830
     """
     if isinstance(value, str):
         return shorten_string(128)(value)
-    output = handler(value)
-    assert isinstance(output, str)
-    return output
+    return handler(value)
 
 
 def get_text_from_file_or_str(value: Path | str | None) -> str | None:
@@ -123,13 +123,33 @@ def get_text_from_file_or_str(value: Path | str | None) -> str | None:
     return value
 
 
-class SettingsSubModel(BaseModel):
+class SettingsSection(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
     )
 
+    @field_validator("*", mode="wrap")
+    def _none_as_default_model(
+        cls,
+        v: Any,
+        handler: ValidatorFunctionWrapHandler,
+        info: ValidationInfo,
+    ) -> Any:
+        try:
+            return handler(v)
+        except ValidationError as e:
+            if v is None and e.errors()[0]["type"] == "model_type":
+                assert info.field_name is not None
+                field_info: FieldInfo = cls.model_fields[info.field_name]
+                if is_subclass(field_info.annotation, SettingsSection):
+                    try:
+                        return field_info.get_default(call_default_factory=True)
+                    except Exception:
+                        raise e from None
+            raise e
 
-class AuthSettings(BaseSettings):
+
+class AuthSettings(SettingsSection):
     secret: str = "secret"
     alg: Algorithm = DEFAULT_ALGORITHM
     iss: str | None = None
@@ -137,14 +157,14 @@ class AuthSettings(BaseSettings):
     expiration_seconds: int = 15 * 60
 
 
-class ServerSettings(SettingsSubModel):
+class ServerSettings(SettingsSection):
     host: IPvAnyAddress = IPv4Address("127.0.0.1")
     port: PositiveInt = 8000
     public_base_url: HttpUrl | None = None
     auth: AuthSettings = AuthSettings()
 
 
-class DBSettings(SettingsSubModel):
+class DBSettings(SettingsSection):
     driver: str = "sqlite+aiosqlite"
     username: str | None = None
     password: str | None = None
@@ -166,14 +186,14 @@ class DBSettings(SettingsSubModel):
         )
 
 
-class TwilioSettings(SettingsSubModel):
+class TwilioSettings(SettingsSection):
     account_sid: StrNoneAsEmpty = ""
     auth_token: SecretStrNoneAsEmpty = SecretStr("")
     phone_number: StrPhone | None = None
     max_parallel_calls: PositiveInt = 1
 
 
-class OpenAISessionOptions(SettingsSubModel):
+class OpenAISessionOptions(SettingsSection):
     instructions: Annotated[
         PathFileExists | Str128 | None,
         Field(union_mode="left_to_right"),
@@ -192,7 +212,7 @@ class OpenAISessionOptions(SettingsSubModel):
     voice: OpenAIVoice = "sage"
 
 
-class OpenAISettings(SettingsSubModel):
+class OpenAISettings(SettingsSection):
     REALTIME_BASE_URL: ClassVar[str] = "wss://api.openai.com/v1/realtime"
     AUDIO_FORMAT: ClassVar[
         Literal["pcm16", "g711_ulaw", "g711_alaw"]
@@ -216,13 +236,6 @@ class OpenAISettings(SettingsSubModel):
     ]
     session: OpenAISessionOptions = OpenAISessionOptions()
 
-    @field_validator("session", mode="before")
-    def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
-        assert info.field_name is not None
-        if v is None:
-            return cls.model_fields[info.field_name].get_default()
-        return v
-
     @property
     def realtime_stream_url(self) -> str:
         return f"{self.REALTIME_BASE_URL}?model={self.session.model}"
@@ -242,14 +255,14 @@ class OpenAISettings(SettingsSubModel):
         return get_text_from_file_or_str(self.session.instructions)
 
 
-class ScheduleSettings(SettingsSubModel):
+class ScheduleSettings(SettingsSection):
     business_start: time = time(hour=8)
     business_end: time = time(hour=18)
     business_days: frozenset[Literal[0, 1, 2, 3, 4, 5, 6]] = frozenset({0, 1, 2, 3, 4})
     retry_delay_hours: PositiveInt = 4
 
 
-class LoggingSettings(SettingsSubModel):
+class LoggingSettings(SettingsSection):
     level: IntLogLevel = INFO
     format: str = "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
     modules: LogModules = {
@@ -259,13 +272,14 @@ class LoggingSettings(SettingsSubModel):
     }
 
 
-class MiscellaneousSettings(SettingsSubModel):
+class MiscellaneousSettings(SettingsSection):
     default_phone_region: str | None = None
     mode: Literal["testing", "production"] = "testing"
 
 
 class Settings(
     BaseSettings,
+    SettingsSection,
     metaclass=Singleton.from_meta(ModelMetaclass),  # type: ignore[misc]
 ):
     """
@@ -274,7 +288,6 @@ class Settings(
     model_config = SettingsConfigDict(
         env_file=".env",
         env_nested_delimiter="__",
-        validate_assignment=True,
         yaml_file="config.yaml",
     )
 
@@ -285,13 +298,6 @@ class Settings(
     schedule: ScheduleSettings = ScheduleSettings()
     logging: LoggingSettings = LoggingSettings()
     misc: MiscellaneousSettings = MiscellaneousSettings()
-
-    @field_validator("*", mode="before")
-    def _none_as_default(cls, v: Any, info: ValidationInfo) -> Any:
-        assert info.field_name is not None
-        if v is None:
-            return cls.model_fields[info.field_name].get_default()
-        return v
 
     @classmethod
     def settings_customise_sources(
