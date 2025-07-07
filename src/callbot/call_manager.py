@@ -9,6 +9,7 @@ from websockets.asyncio.client import ClientConnection
 
 from callbot.auth.jwt import JWT
 from callbot.exceptions import EndCall, TwilioWebsocketStopReceived
+from callbot.hooks import AfterCallStartHook
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -147,10 +148,12 @@ class CallManager:
                 _jwt = JWT.decode_and_invalidate(token)
                 log.info(f"🔐 Connection secure")
                 self.stream_sid = message.start.streamSid
+                self.call_sid = message.start.callSid
                 self.contact_info = Contact.model_validate(
                     message.start.customParameters
                 )
                 self.contact_info_ready.set()
+                await AfterCallStartHook(self).dispatch()
                 log.debug(f"Incoming stream has started {self.stream_sid}")
                 self.response_start_timestamp_twilio = None
                 self.latest_media_timestamp = 0

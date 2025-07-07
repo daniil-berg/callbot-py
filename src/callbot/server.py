@@ -12,6 +12,7 @@ from callbot.auth.jwt import JWT
 from callbot.call_manager import CallManager
 from callbot.caller import Caller
 from callbot.db import EngineWrapper as DBEngine, Session
+from callbot.hooks import AfterCallEndHook, BeforeStartupHook
 from callbot.schemas.contact import Contact, Phone
 from callbot.settings import Settings
 from callbot.types import StrDict
@@ -24,6 +25,7 @@ JWTDep = Depends(JWT.decode_and_invalidate)
 @asynccontextmanager
 async def lifespan(_fastapi: FastAPI) -> AsyncIterator[None]:
     await DBEngine().create_tables()
+    await BeforeStartupHook(_fastapi).dispatch()
     yield
     # Potential clean up code here...
 
@@ -52,6 +54,7 @@ async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
         call_manager = CallManager(twilio_ws, openai_ws)
         await call_manager.openai_init_session()
         await call_manager.run()
+    await AfterCallEndHook(call_manager).dispatch()
 
 
 @app.post(
