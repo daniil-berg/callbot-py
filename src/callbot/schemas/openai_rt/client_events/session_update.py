@@ -3,7 +3,11 @@ from typing import Annotated, Literal, Self
 from openai.types.beta.realtime import session_update_event as base
 from pydantic import Field
 
-from callbot.settings import FloatOpenAISpeed, FloatOpenAITemperature, Settings
+from callbot.settings import Settings
+from callbot.settings._validators_types import (
+    FloatOpenAISpeed,
+    FloatOpenAITemperature,
+)
 from callbot.schemas.openai_rt.function import Arguments, Function
 
 

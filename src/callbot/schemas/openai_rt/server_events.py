@@ -27,7 +27,7 @@ from openai.types.beta.realtime.session_created_event import SessionCreatedEvent
 from openai.types.beta.realtime.session_updated_event import SessionUpdatedEvent as _SessionUpdatedEvent
 from pydantic import Field, TypeAdapter
 
-from callbot.settings import Str128
+from callbot.settings._validators_types import Str128
 
 
 class ConversationItemContent(_ConversationItemContent):
