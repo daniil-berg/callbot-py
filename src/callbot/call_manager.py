@@ -1,4 +1,4 @@
-from asyncio import Event, gather
+from asyncio import Event, TaskGroup, gather
 from dataclasses import dataclass, field
 from string import Template as TemplateString
 
@@ -8,7 +8,13 @@ from pydantic import ValidationError
 from websockets.asyncio.client import ClientConnection
 
 from callbot.auth.jwt import JWT
-from callbot.exceptions import EndCall, TwilioWebsocketStopReceived
+from callbot.exceptions import (
+    CallManagerException,
+    EndCall,
+    FunctionEndCall,
+    TwilioStop,
+    TwilioWebsocketDisconnect,
+)
 from callbot.hooks import AfterCallStartHook
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
@@ -78,11 +84,28 @@ class CallManager:
         If an initial conversation prompt is configured, the model is prompted
         to start the conversation.
         """
-        await gather(
-            self.openai_start_conversation(),
-            self.twilio_listen(),
-            self.openai_listen(),
-        )
+        try:
+            async with TaskGroup() as task_group:
+                task_group.create_task(self.openai_start_conversation())
+                task_group.create_task(self.twilio_listen())
+                task_group.create_task(self.openai_listen())
+        except* EndCall as exception_group:
+            end_call, others = exception_group.split(EndCall)
+            if end_call is not None:
+                for exception in end_call.exceptions:
+                    msg = f"Call ended. {exception}"
+                    match exception:
+                        case FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
+                            log.info(msg)
+                        case CallManagerException():
+                            log.exception(msg)
+                        case _:
+                            log.warning(msg)
+            if others is not None:
+                log.exception(f"Unexpected exceptions in call: {others}")
+        finally:
+            await self.twilio_websocket.close()
+            await self.openai_websocket.close()
 
     async def openai_start_conversation(self) -> None:
         """
@@ -127,10 +150,12 @@ class CallManager:
             async for text in self.twilio_websocket.iter_text():
                 await self.handle_twilio_message(text)
         # TODO: Handle `AuthException`.
-        except (TwilioWebsocketStopReceived, WebSocketDisconnect):
-            log.info(f"Twilio disconnected, stream {self.stream_sid} stopped")
-            # TODO: Handle `ConnectionClosed`.
-            await self.openai_websocket.close()
+        except WebSocketDisconnect as e:
+            raise TwilioWebsocketDisconnect() from e
+        except EndCall as e:
+            raise e
+        except Exception as e:
+            raise CallManagerException("twilio_listen", e) from e
 
     async def handle_twilio_message(self, text: str) -> None:
         try:
@@ -169,10 +194,7 @@ class CallManager:
                 if self.mark_queue:
                     self.mark_queue.pop(0)
             case TwilioInboundStop():
-                # TODO: Handle `ConnectionClosed`.
-                await self.openai_websocket.close()
-                await self.twilio_websocket.close()
-                raise TwilioWebsocketStopReceived()
+                raise TwilioStop()
 
     async def openai_listen(self) -> None:
         """
@@ -186,10 +208,10 @@ class CallManager:
             async for text in self.openai_websocket:
                 assert isinstance(text, str)
                 await self.handle_openai_message(text)
+        except EndCall as e:
+            raise e
         except Exception as e:
-            if isinstance(e, EndCall):
-                await self.twilio_websocket.close()
-            log.exception(f"Error in openai_listen: {e}")
+            raise CallManagerException("openai_listen", e) from e
 
     async def handle_openai_message(self, text: str) -> None:
         try:
@@ -233,11 +255,13 @@ class CallManager:
                     ),
                     return_exceptions=True,
                 )
-                if isinstance(exc, Exception):
-                    if isinstance(exc, EndCall):
-                        log.info(f"'{function.get_name()}' ending call: {exc}")
+                match exc:
+                    case FunctionEndCall():
                         raise exc
-                    log.debug(f"Error in '{function.get_name()}': {exc}")
+                    case EndCall():
+                        raise FunctionEndCall(function, str(exc)) from exc
+                    case Exception():
+                        log.warning(f"Error in '{function.get_name()}': {exc}")
 
     async def _handle_speech_started_event(self) -> None:
         log.debug("Handling speech started event.")
