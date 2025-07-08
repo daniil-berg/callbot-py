@@ -1,9 +1,12 @@
+from importlib import import_module
 from importlib.metadata import entry_points
 from typing import Annotated
 
 import uvicorn
+from loguru import logger as log
 from typer import Option, Typer
 
+from callbot.schemas.openai_rt.function import Function
 from callbot.settings import Settings
 
 
@@ -34,8 +37,12 @@ def serve(
         settings.server.host = host  # type: ignore[assignment]
     if port is not None:
         settings.server.port = port
+    log.info("Starting callbot server...")
+    import_module("callbot.functions")
     for plugin in entry_points(group="callbot.functions"):
         plugin.load()
+    functions = ", ".join(f"'{name}'" for name in Function.registry.keys())
+    log.debug(f"Available callbot functions: {functions}")
     uvicorn.run(
         server.app,
         host=str(settings.server.host),

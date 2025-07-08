@@ -27,6 +27,7 @@ class Hook:
                 continue
             callbacks.append(callback(self))
             names.append(name)
+        log.debug(f"Dispatching {self.__class__.__name__}. Callbacks: {names}")
         outputs = await gather(*callbacks, return_exceptions=True)
         for idx, output in enumerate(outputs):
             if isinstance(output, Exception):
