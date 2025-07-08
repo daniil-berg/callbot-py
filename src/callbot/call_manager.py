@@ -15,7 +15,11 @@ from callbot.exceptions import (
     TwilioStop,
     TwilioWebsocketDisconnect,
 )
-from callbot.hooks import AfterCallStartHook
+from callbot.hooks import (
+    AfterCallStartHook,
+    AfterFunctionCallHook,
+    BeforeFunctionCallHook,
+)
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -247,6 +251,7 @@ class CallManager:
             case OpenAIRTResponseDoneEvent():
                 if not (function := Function.from_response(event.response)):
                     return
+                await BeforeFunctionCallHook(function, self).dispatch()
                 response_create = OpenAIRTResponseCreateEvent()
                 exc, _ = await gather(
                     function(self),
@@ -255,6 +260,7 @@ class CallManager:
                     ),
                     return_exceptions=True,
                 )
+                await AfterFunctionCallHook(function, self, exc).dispatch()
                 match exc:
                     case FunctionEndCall():
                         raise exc
