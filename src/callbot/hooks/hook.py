@@ -5,6 +5,7 @@ from typing import Any
 
 from loguru import logger as log
 
+from callbot.misc.generic_insight import GenericInsightMixin1
 from callbot.misc.util import is_subclass
 
 
@@ -17,7 +18,7 @@ class Hook:
             if not is_subclass(callback_cls, Callback):
                 log.error(f"{plugin.value} is not a hook callback class")
                 continue
-            if callback_cls.hook is not self.__class__:
+            if not callback_cls.is_bound_to(self):
                 continue
             name = plugin.name
             try:
@@ -34,16 +35,20 @@ class Hook:
                 log.error(f"Exception in hook callback {names[idx]}: {output}")
 
 
-class Callback[_H: Hook](ABC):
-    hook: type[_H]
-
+class Callback[_H: Hook](GenericInsightMixin1[_H], ABC):
     @classmethod
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        if not hasattr(cls, "hook"):
-            raise TypeError(f"{cls.__name__} does not define a hook")
-        if not is_subclass(cls.hook, Hook):
-            raise TypeError(f"{cls.hook.__class__.__name__} is not a hook")
+        super().__init_subclass__(**kwargs)
+        hook = cls._get_type_arg(0)
+        if not is_subclass(hook, Hook):
+            raise TypeError(f"{hook.__class__.__name__} is not a hook")
+
+    @classmethod
+    def is_bound_to(cls, hook: Hook | type[Hook]) -> bool:
+        if isinstance(hook, Hook):
+            return cls._get_type_arg(0) is hook.__class__
+        return cls._get_type_arg(0) is hook
 
     @abstractmethod
-    async def __call__(self, __hook: _H, /) -> None:
+    async def __call__(self, hook: _H, /) -> None:
         ...
