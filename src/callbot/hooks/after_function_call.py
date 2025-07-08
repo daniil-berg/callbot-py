@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from .hook import Hook
@@ -9,13 +10,8 @@ if TYPE_CHECKING:
     from callbot.schemas.openai_rt.function import Function
 
 
+@dataclass
 class AfterFunctionCallHook(Hook):
-    def __init__(
-        self,
-        function: Function[Any],
-        call_manager: CallManager,
-        exception: BaseException | None = None,
-    ) -> None:
-        self.function = function
-        self.call_manager = call_manager
-        self.exception = exception
+    function: Function[Any]
+    call_manager: CallManager
+    exception: BaseException | None = None

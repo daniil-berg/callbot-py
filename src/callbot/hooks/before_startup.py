@@ -1,8 +1,10 @@
+from dataclasses import dataclass
+
 from fastapi import FastAPI
 
 from .hook import Hook
 
 
+@dataclass
 class BeforeStartupHook(Hook):
-    def __init__(self, app: FastAPI) -> None:
-        self.app = app
+    app: FastAPI
