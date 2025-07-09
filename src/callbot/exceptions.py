@@ -57,10 +57,10 @@ class AuthException(HTTPException, CallbotException):
 
 
 class JWTInvalid(AuthException):
-    def __init__(self) -> None:
+    def __init__(self, token: str) -> None:
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="JWT invalid",
+            detail=f"JWT invalid: {token}",
         )
 
 
@@ -68,7 +68,7 @@ class JTIMissing(AuthException):
     def __init__(self) -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="JTI missing",
+            detail="JTI missing from JWT payload",
         )
 
 

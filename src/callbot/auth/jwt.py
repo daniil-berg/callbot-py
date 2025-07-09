@@ -32,13 +32,10 @@ class JWT(BaseJWT[Payload]):
                 issuer=settings.server.auth.iss,
             )
         except (DecodeError, ValidationError):
-            log.info("Invalid JWT")
-            raise JWTInvalid from None
+            raise JWTInvalid(token) from None
         if jwt.payload.registered_claims.jti is None:
-            log.info("JTI missing from JWT payload")
             raise JTIMissing()
         if jwt.payload.registered_claims.jti in cls.used_jti:
-            log.warning("Reused JTI encountered")
             raise JTIReused()
         cls.used_jti.add(jwt.payload.registered_claims.jti)
         return jwt

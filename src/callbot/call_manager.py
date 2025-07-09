@@ -2,7 +2,7 @@ from asyncio import Event, TaskGroup, gather
 from dataclasses import dataclass, field
 from string import Template as TemplateString
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, WebSocketException, status
 from loguru import logger as log
 from pydantic import ValidationError
 from websockets.asyncio.client import ClientConnection
@@ -13,7 +13,7 @@ from callbot.exceptions import (
     EndCall,
     FunctionEndCall,
     TwilioStop,
-    TwilioWebsocketDisconnect,
+    TwilioWebsocketDisconnect, AuthException,
 )
 from callbot.functions import Function
 from callbot.hooks import (
@@ -94,13 +94,22 @@ class CallManager:
                 task_group.create_task(self.openai_start_conversation())
                 task_group.create_task(self.twilio_listen())
                 task_group.create_task(self.openai_listen())
-        except* EndCall as exception_group:
-            end_call, others = exception_group.split(EndCall)
-            if end_call is not None:
-                for exception in end_call.exceptions:
-                    self._handle_end_call(exception)
-            if others is not None:
-                log.exception(f"Unexpected exceptions in call: {others}")
+        except* EndCall as end_call_group:
+            for exception in end_call_group.exceptions:
+                self._handle_end_call(exception)
+        except* AuthException as auth_exception_group:
+            # The Twilio listener is the only possible `AuthException` source.
+            assert len(auth_exception_group.exceptions) == 1
+            auth_exception = auth_exception_group.exceptions[0]
+            # There should be no nested exception groups.
+            assert isinstance(auth_exception, AuthException)
+            # Propagate this as an appropriately coded websocket error.
+            raise WebSocketException(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason=auth_exception.detail,
+            ) from auth_exception
+        except* Exception as exc:
+            log.exception(f"Unexpected exceptions in call: {exc}")
         finally:
             await self.twilio_websocket.close()
             await self.openai_websocket.close()
@@ -158,7 +167,6 @@ class CallManager:
         try:
             async for text in self.twilio_websocket.iter_text():
                 await self.handle_twilio_message(text)
-        # TODO: Handle `AuthException`.
         except WebSocketDisconnect as e:
             raise TwilioWebsocketDisconnect() from e
         except EndCall as e:
