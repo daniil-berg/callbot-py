@@ -2,7 +2,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 from loguru import logger as log
 
-from callbot.schemas.openai_rt.function import Arguments as _Arguments, Function
+from callbot.functions import Arguments as _Arguments, Function
 
 if TYPE_CHECKING:
     from callbot.call_manager import CallManager

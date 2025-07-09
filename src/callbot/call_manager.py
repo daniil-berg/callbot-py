@@ -15,6 +15,7 @@ from callbot.exceptions import (
     TwilioStop,
     TwilioWebsocketDisconnect,
 )
+from callbot.functions import Function
 from callbot.hooks import (
     AfterCallStartHook,
     AfterFunctionCallHook,
@@ -31,7 +32,6 @@ from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defin
     SessionTurnDetection as OpenAIRTSessionTurnDetection,
     SessionUpdateEvent as OpenAIRTSessionUpdateEvent,
 )
-from callbot.schemas.openai_rt.function import Function
 from callbot.schemas.openai_rt.server_events import (  # type: ignore[attr-defined]
     ErrorEvent as OpenAIRTErrorEvent,
     InputAudioBufferSpeechStartedEvent as OpenAIRTInputAudioBufferSpeechStartedEvent,

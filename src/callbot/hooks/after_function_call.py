@@ -7,7 +7,7 @@ from .hook import Hook
 
 if TYPE_CHECKING:
     from callbot.call_manager import CallManager
-    from callbot.schemas.openai_rt.function import Function
+    from callbot.functions import Function
 
 
 @dataclass

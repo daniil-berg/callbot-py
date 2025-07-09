@@ -6,7 +6,7 @@ from fastapi import status
 from fastapi.exceptions import HTTPException
 
 if TYPE_CHECKING:
-    from callbot.schemas.openai_rt.function import Function
+    from callbot.functions import Function
 
 
 __all__ = [

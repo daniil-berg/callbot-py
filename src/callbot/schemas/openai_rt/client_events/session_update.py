@@ -8,7 +8,7 @@ from callbot.settings._validators_types import (
     FloatOpenAISpeed,
     FloatOpenAITemperature,
 )
-from callbot.schemas.openai_rt.function import Arguments, Function
+from callbot.functions import Arguments, Function
 
 
 class SessionInputAudioTranscription(base.SessionInputAudioTranscription):
