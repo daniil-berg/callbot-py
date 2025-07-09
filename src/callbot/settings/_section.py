@@ -21,6 +21,7 @@ from callbot.misc.util import is_subclass
 class SettingsSection(BaseModel):
     model_config = ConfigDict(
         validate_assignment=True,
+        validate_default=True,
     )
 
     @field_validator("*", mode="wrap")
