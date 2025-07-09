@@ -20,6 +20,7 @@ from callbot.hooks import (
     AfterFunctionCallHook,
     BeforeFunctionCallHook,
 )
+from callbot.hooks.before_conversation_start import BeforeConversationStart
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -126,9 +127,9 @@ class CallManager:
         await self.contact_info_ready.wait()
         assert self.contact_info is not None
         prompt = template.safe_substitute(self.contact_info.model_dump())
-        await self.openai_send_conversation_item(
-            OpenAIRTConversationItemCreateEvent.with_user_prompt(prompt)
-        )
+        event = OpenAIRTConversationItemCreateEvent.with_user_prompt(prompt)
+        await BeforeConversationStart(event.item, self).dispatch()
+        await self.openai_send_conversation_item(event)
 
     async def openai_send_conversation_item(
         self,
