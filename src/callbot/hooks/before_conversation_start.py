@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from callbot.schemas.openai_rt.server_events import ConversationItem  # type: ignore[attr-defined]
+from callbot.schemas.openai_rt.server_events import ConversationItem
 from .hook import Hook
 
 if TYPE_CHECKING:
