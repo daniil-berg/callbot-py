@@ -24,6 +24,19 @@ class Contact(SQLModel):
     title: str = ""
     role: str = ""
 
+    def __str__(self) -> str:
+        output = f"{self.salutation} {self.firstname} {self.lastname}"
+        if self.company:
+            if self.role:
+                output += f" ({self.role} @ {self.company})"
+            else:
+                output += f" ({self.company})"
+        return output
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.firstname} {self.lastname}"
+
     def to_db(self) -> "ContactDB":
         return ContactDB.model_validate(self)
 
