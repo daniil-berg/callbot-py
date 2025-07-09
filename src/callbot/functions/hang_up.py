@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any, Optional, TYPE_CHECKING
 
 from callbot.exceptions import EndCall
@@ -7,8 +8,16 @@ if TYPE_CHECKING:
     from callbot.call_manager import CallManager
 
 
+class Reason(StrEnum):
+    goodbye = "goodbye"
+    voicemail = "voicemail"
+    failure = "failure"
+    other = "other"
+
+
 class Arguments(_Arguments):
-    reason: str
+    reason: Reason
+    explanation: str | None = None
 
 
 class HangUp(Function[Arguments], register=True):
@@ -29,15 +38,27 @@ class HangUp(Function[Arguments], register=True):
             "type": "object",
             "properties": {
                 "reason": {
-                    "type": "string",
-                    "description": "The reason you consider the conversation "
-                                   "to be over. One or two sentences.",
-                    "examples": [
-                        "The other person said good-bye.",
-                        "I reached an answering machine/voicemail.",
-                        "I asked something, but got no response for 8 seconds.",
-                        "I only heard static/noise. The connection was faulty.",
+                    "enum": [
+                        "goodbye",
+                        "voicemail",
+                        "failure",
+                        "other",
                     ],
+                    "description": "The reason you consider the conversation "
+                                   "to be over. Use \"goodbye\", if it ended "
+                                   "normally. Use \"voicemail\", if you "
+                                   "reached an answering machine/voicemail. "
+                                   "Use \"failure\", if the connection was "
+                                   "faulty or you were cut off from continuing "
+                                   "the conversation. Use \"other\", for any "
+                                   "other reason, and provide an explanation "
+                                   "via the `explanation` property.",
+                },
+                "explanation": {
+                    "type": "string",
+                    "description": "If the reason is \"other\", describe it in "
+                                   "one or two sentences with this argument. "
+                                   "Otherwise omit this property.",
                 },
             },
             "required": ["reason"],
@@ -47,7 +68,9 @@ class HangUp(Function[Arguments], register=True):
     async def __call__(self, call: Optional["CallManager"] = None) -> None:
         assert self.arguments is not None
         assert call is not None
-        msg = f"Reason: {self.arguments.reason}"
+        msg = f"Reason: '{self.arguments.reason}'"
+        if self.arguments.reason == Reason.other:
+            msg += f" ({self.arguments.explanation})"
         if call.contact_info:
-            msg += f" Contact: {call.contact_info.model_dump_json()}"
+            msg += f". Contact: {call.contact_info.model_dump_json()}"
         raise EndCall(msg)
