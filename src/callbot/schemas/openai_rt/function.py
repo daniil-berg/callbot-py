@@ -7,7 +7,7 @@ from caseutil import to_snake
 from loguru import logger as log
 from openai.types.beta.realtime.session_update_event import SessionTool as _SessionTool
 from openai.types.beta.realtime.realtime_response import RealtimeResponse
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 if TYPE_CHECKING:
     from callbot.call_manager import CallManager
@@ -64,14 +64,19 @@ class Function[ArgT: Arguments](SessionTool):
         for output in response.output:
             if output.type != "function_call" or output.name is None:
                 continue
-            log.debug(f"Function call detected: {output.name}")
-            if (func_cls := Function.registry.get(output.name)) is None:
+            name = output.name
+            log.debug(f"Function call detected: {name}")
+            if (func_cls := Function.registry.get(name)) is None:
                 continue
             if output.arguments is None:
                 args = None
             else:
                 args = json.loads(output.arguments)
-            return func_cls(arguments=args)
+            try:
+                return func_cls(arguments=args)
+            except ValidationError as e:
+                log.error(f"Invalid arguments for '{name}': {e.json()}")
+                return None
         return None
 
     @classmethod
