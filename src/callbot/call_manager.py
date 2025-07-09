@@ -98,19 +98,23 @@ class CallManager:
             end_call, others = exception_group.split(EndCall)
             if end_call is not None:
                 for exception in end_call.exceptions:
-                    msg = f"Call ended. {exception}"
-                    match exception:
-                        case FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
-                            log.info(msg)
-                        case CallManagerException():
-                            log.exception(msg)
-                        case _:
-                            log.warning(msg)
+                    self._handle_end_call(exception)
             if others is not None:
                 log.exception(f"Unexpected exceptions in call: {others}")
         finally:
             await self.twilio_websocket.close()
             await self.openai_websocket.close()
+
+    @staticmethod
+    def _handle_end_call(exc: EndCall | ExceptionGroup[EndCall]) -> None:
+        msg = f"Call ended. {exc}"
+        match exc:
+            case FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
+                log.info(msg)
+            case CallManagerException():
+                log.exception(msg)
+            case _:
+                log.warning(msg)
 
     async def openai_start_conversation(self) -> None:
         """
