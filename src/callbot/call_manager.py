@@ -144,7 +144,7 @@ class CallManager:
             event.model_dump_json(exclude_none=True)
         )
         await self.openai_websocket.send(
-            OpenAIRTResponseCreateEvent().model_dump_json(exclude_none=True)
+            OpenAIRTResponseCreateEvent().default_json()
         )
 
     async def twilio_listen(self) -> None:
@@ -210,19 +210,19 @@ class CallManager:
         Handles messages sent over the OpenAI websocket from their Realtime API.
 
         Each message is parsed via the Pydantic `ServerEvent` model union. See
-        `handle_openai_message` for details on how each type of message is
+        `handle_openai_event` for details on how each type of message is
         handled.
         """
         try:
             async for text in self.openai_websocket:
                 assert isinstance(text, str)
-                await self.handle_openai_message(text)
+                await self.handle_openai_event(text)
         except EndCall as e:
             raise e
         except Exception as e:
             raise CallManagerException("openai_listen", e) from e
 
-    async def handle_openai_message(self, text: str) -> None:
+    async def handle_openai_event(self, text: str) -> None:
         try:
             event = OpenAIRTServerEvent.validate_json(text)
         except ValidationError as validation_error:
@@ -257,12 +257,10 @@ class CallManager:
                 if not (function := Function.from_response(event.response)):
                     return
                 await BeforeFunctionCallHook(function, self).dispatch()
-                response_create = OpenAIRTResponseCreateEvent()
+                response_create = OpenAIRTResponseCreateEvent().default_json()
                 exc, _ = await gather(
                     function(self),
-                    self.openai_websocket.send(
-                        response_create.model_dump_json(exclude_none=True)
-                    ),
+                    self.openai_websocket.send(response_create),
                     return_exceptions=True,
                 )
                 await AfterFunctionCallHook(function, self, exc).dispatch()
