@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any, ClassVar, Literal, TYPE_CHECKING
+from typing import Any, ClassVar, Literal, TYPE_CHECKING, cast
 
 from caseutil import to_snake
 from loguru import logger as log
 from openai.types.beta.realtime.session_update_event import SessionTool as _SessionTool
 from openai.types.beta.realtime.realtime_response import RealtimeResponse
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic._internal._model_construction import ModelMetaclass
+
+from callbot.settings import Settings
 
 if TYPE_CHECKING:
     from callbot.call_manager import CallManager
@@ -21,19 +24,43 @@ class Arguments(BaseModel):
     pass
 
 
-class Function[ArgT: Arguments](SessionTool):
+class FunctionMeta(ModelMetaclass):
+    registry: ClassVar[dict[str, type[Function[Any]]]] = {}
+
+    def __new__(
+        mcs,
+        cls_name: str,
+        bases: tuple[type[Any], ...],
+        namespace: dict[str, Any],
+        register: bool = False,
+        **kwargs: Any,
+    ) -> type[Any]:
+        cls = cast(
+            "type[Function[Any]]",
+            super().__new__(mcs, cls_name, bases, namespace, **kwargs),
+        )
+        if register:
+            mcs.registry[cls.get_name()] = cls
+            # TODO: Catch validation errors.
+            instance = cls()
+            settings = Settings()
+            if settings.openai.session.tools is None:
+                settings.openai.session.tools = [instance]
+            else:
+                settings.openai.session.tools.append(instance)
+        return cls
+
+    @classmethod
+    def get_by_name(cls, name: str) -> type[Function[Any]] | None:
+        return cls.registry.get(name)
+
+
+class Function[ArgT: Arguments](SessionTool, metaclass=FunctionMeta):
     model_config = ConfigDict(
         validate_default=True,
     )
-    registry: ClassVar[
-        dict[str, type[Function[Any]]]
-    ] = {}
 
     arguments: ArgT | None = None
-
-    def __init_subclass__(cls, register: bool = False, **kwargs: Any) -> None:
-        if register:
-            Function.registry[cls.get_name()] = cls
 
     @field_validator("name", mode="plain")
     def _get_name(cls, v: str | None) -> str:
@@ -54,10 +81,6 @@ class Function[ArgT: Arguments](SessionTool):
         return v
 
     @staticmethod
-    def all() -> list[Function[Arguments]]:
-        return [subclass() for subclass in Function.registry.values()]
-
-    @staticmethod
     def from_response(response: RealtimeResponse) -> Function[Arguments] | None:
         if response.output is None:
             return None
@@ -66,7 +89,7 @@ class Function[ArgT: Arguments](SessionTool):
                 continue
             name = output.name
             log.debug(f"Function call detected: {name}")
-            if (func_cls := Function.registry.get(name)) is None:
+            if (func_cls := FunctionMeta.get_by_name(name)) is None:
                 continue
             if output.arguments is None:
                 args = None

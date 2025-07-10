@@ -1,26 +1,36 @@
 # Server related settings.
 server:
+
   # Local IP the webserver should bind to.
   host: 127.0.0.1
+
   # Local port the webserver should bind to.
   port: 8000
+
   # Public facing base URL of the application.
   public_base_url:
 
 # Database settings.
 db:
+
   # Database backend/driver name (e.g. "postgresql+psycopg2").
   driver: "sqlite+aiosqlite"
+
   # Username for authentication.
   username:
+
   # Database password for authentication.
   password:
+
   # Resolvable name or IP address of the host.
   host:
+
   # Port number.
   port:
+
   # Name of the database.
   name:
+
   # Query parameters to pass to the dialect and/or the DBAPI when connecting.
   query:
 
@@ -36,37 +46,62 @@ twilio:
 
 # Settings related to the OpenAI realtime API.
 openai:
+
   # API authentication token to provide to OpenAI.
   api_key:
+
   # First prompt to send to the model for it to initiate the conversation.
   # Instead of a text prompt, this may be a path to a text file containing that prompt.
   init_conversation_prompt:
+
   # Options to set for an entire realtime session.
+  # This section largely overlaps with the `session` property of the `session.update` event
+  # as described in the official OpenAI Realtime API documentation:
+  # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+  # The difference are as follows:
+  #   1) `input_audio_format` and `output_audio_format` are fixed to `g711_ulaw` and cannot be changed.
+  #   2) `modalities` are fixed to `["audio", "text"]` and cannot be changed.
+  #   3) `turn_detection.type` defaults to `semantic_vad`, but can be changed.
+  #   4) `instructions_file` is a custom parameter that can be used instead of `instructions`.
+  #   5) `tools` should not be set at all. It will be overwritten at runtime by the registered functions.
   session:
+
     # System instructions to the model before the start of the conversation.
-    # Instead of a text prompt, this may be a path to a text file containing that prompt.
+    # If used together with `instructions_file`, the latter will take precedence.
     instructions:
+
+    # Path to a text file containing system instructions to the model before the start of the conversation.
+    # If set, this takes precedence over `instructions`.
+    instructions_file:
+
     # Specific model snapshot to use.
     model: gpt-4o-realtime-preview-2025-06-03
+
     # Speed of the model's spoken response. Must be between 0.25 and 1.5.
     speed: 1.0
+
     # Sampling temperature for the model. Must be between 0.6 and 1.2.
     temperature: 0.8
+
     # Voice the model shall use to respond.
     # Options: "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"
-    voice: sage
+    voice:
 
 # Logging configuration.
 logging:
+
   # Global log level.
   # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
   level: INFO
+
   # Format for log messages.
   # See: https://loguru.readthedocs.io/en/stable/api/logger.html#record
   # Also see: https://loguru.readthedocs.io/en/stable/api/logger.html#color
+
   format: "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
   # Explicit logging activation/deactivation by module name.
   # Keys should be module names; values should be booleans.
+
   modules:
     aiosqlite: false
     sqlalchemy: false
@@ -74,5 +109,6 @@ logging:
 
 # Miscellaneous options.
 misc:
+
   # If provided, phone numbers not in international format can be converted to that format assuming this region code.
   default_phone_region:

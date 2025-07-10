@@ -56,6 +56,18 @@ FloatOpenAISpeed = Annotated[float, Ge(0.25), Le(1.5)]
 FloatOpenAITemperature = Annotated[float, Ge(0.6), Le(1.2)]
 IntLogLevel = Annotated[PositiveInt, Le(CRITICAL), WrapValidator(log_level_num)]
 LogModules = Annotated[dict[str, bool], NoneAsEmptyDict]
+OpenAIAudioTranscriptionModel = Literal[
+    "gpt-4o-transcribe",
+    "gpt-4o-mini-transcribe",
+    "whisper-1",
+]
+OpenAIMaxResponseOutputTokens = Annotated[int, Ge(1), Le(4096)] | Literal["inf"]
+OpenAIModalities = (
+    tuple[Literal["text", "audio"]] |
+    tuple[Literal["text"], Literal["audio"]] |
+    tuple[Literal["audio"], Literal["text"]]
+)
+OpenAITurnDetectionThreshold = Annotated[float, Ge(0.0), Le(1.0)]
 OpenAIVoice: TypeAlias = Literal[
     "alloy",
     "ash",

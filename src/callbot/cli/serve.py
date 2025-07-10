@@ -6,7 +6,6 @@ import uvicorn
 from loguru import logger as log
 from typer import Option, Typer
 
-from callbot.functions import Function
 from callbot.settings import Settings
 
 
@@ -41,7 +40,7 @@ def serve(
     import_module("callbot.functions")
     for plugin in entry_points(group="callbot.functions"):
         plugin.load()
-    functions = sorted(Function.registry.keys())
+    functions = settings.openai.session.tool_names
     log.debug(f"Available callbot functions: {functions}")
     uvicorn.run(
         server.app,

@@ -40,6 +40,7 @@ class Settings(
     openai: OpenAISettings = OpenAISettings()
     logging: LoggingSettings = LoggingSettings()
     misc: MiscSettings = MiscSettings()
+    # TODO: This is dumped without applying serialization rules.
     plugins: PluginsSettings = PluginsSettings()
 
     _plugin_cache: dict[str, SettingsSection] = {}

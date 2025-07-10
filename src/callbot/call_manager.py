@@ -28,8 +28,6 @@ from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defin
     ConversationItemTruncateEvent as OpenAIRTConversationItemTruncateEvent,
     InputAudioBufferAppendEvent as OpenAIRTInputAudioBufferAppendEvent,
     ResponseCreateEvent as OpenAIRTResponseCreateEvent,
-    Session as OpenAIRTSession,
-    SessionTurnDetection as OpenAIRTSessionTurnDetection,
     SessionUpdateEvent as OpenAIRTSessionUpdateEvent,
 )
 from callbot.schemas.openai_rt.server_events import (  # type: ignore[attr-defined]
@@ -76,7 +74,9 @@ class CallManager:
         The session instructions, temperature, voice, etc. are taken from the
         global settings object.
         """
-        session_update = OpenAIRTSessionUpdateEvent.from_settings()
+        session_update = OpenAIRTSessionUpdateEvent(
+            session=Settings().openai.session
+        )
         log.debug("Updating OpenAI session")
         await self.openai_websocket.send(
             session_update.model_dump_json(exclude_none=True)

@@ -1,14 +1,17 @@
 from pathlib import Path
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import Field, SecretStr, WrapSerializer
+from pydantic import Field, SecretStr, WrapSerializer, computed_field
 from pydantic_core.core_schema import SerializerFunctionWrapHandler
 
+from callbot.schemas.openai_rt.client_events.session import (
+    Session,
+    SessionTurnDetection,
+)
 from callbot.settings._section import SettingsSection
 from callbot.settings._validators_types import (
     FloatOpenAISpeed,
     FloatOpenAITemperature,
-    OpenAIVoice,
     PathFileExists,
     SecretStrNoneAsEmpty,
     Str128,
@@ -29,12 +32,11 @@ def workaround_shorten_128(
     return handler(value)
 
 
-class SessionSettings(SettingsSection):
-    instructions: Annotated[
-        PathFileExists | Str128 | None,
-        Field(union_mode="left_to_right"),
-        WrapSerializer(workaround_shorten_128),
-    ] = None
+class SessionSettings(SettingsSection, Session):
+    input_audio_format: Literal["g711_ulaw"] = "g711_ulaw"
+    instructions: Str128 | None = None
+    instructions_file: PathFileExists | None = None
+    modalities: tuple[Literal["audio"], Literal["text"]] = ("audio", "text")
     model: Literal[
         "gpt-4o-mini-realtime-preview",
         "gpt-4o-mini-realtime-preview-2024-12-17",
@@ -43,16 +45,30 @@ class SessionSettings(SettingsSection):
         "gpt-4o-realtime-preview-2024-12-17",
         "gpt-4o-realtime-preview-2025-06-03",
     ] = "gpt-4o-realtime-preview-2025-06-03"
+    output_audio_format: Literal["g711_ulaw"] = "g711_ulaw"
     speed: FloatOpenAISpeed = 1.0
     temperature: FloatOpenAITemperature = 0.8
-    voice: OpenAIVoice = "sage"
+    turn_detection: SessionTurnDetection | None = SessionTurnDetection(
+        type="semantic_vad",
+    )
+
+    def model_post_init(self, context: Any, /) -> None:
+        self._update_instructions()
+
+    def _update_instructions(self) -> None:
+        if self.instructions_file:
+            self.instructions = self.instructions_file.read_text().strip()
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def tool_names(self) -> list[str]:
+        if self.tools is None:
+            return []
+        return sorted(tool.name for tool in self.tools if tool.name)
 
 
 class OpenAISettings(SettingsSection):
     REALTIME_BASE_URL: ClassVar[str] = "wss://api.openai.com/v1/realtime"
-    AUDIO_FORMAT: ClassVar[
-        Literal["pcm16", "g711_ulaw", "g711_alaw"]
-    ] = "g711_ulaw"
 
     api_key: SecretStrNoneAsEmpty = SecretStr("")
     init_conversation_prompt: Annotated[
@@ -86,9 +102,6 @@ class OpenAISettings(SettingsSection):
 
     def get_init_conversation_prompt(self) -> str | None:
         return _get_text_from_file_or_str(self.init_conversation_prompt)
-
-    def get_session_instructions(self) -> str | None:
-        return _get_text_from_file_or_str(self.session.instructions)
 
     @classmethod
     def section_name(cls) -> str:  # type: ignore[override]

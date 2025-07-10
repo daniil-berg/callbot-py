@@ -2,8 +2,4 @@ from .conversation_item_create import ConversationItemCreateEvent
 from .conversation_item_truncate import ConversationItemTruncateEvent
 from .input_audio_buffer_append import InputAudioBufferAppendEvent
 from .response_create import ResponseCreateEvent
-from .session_update import (
-    Session,
-    SessionTurnDetection,
-    SessionUpdateEvent,
-)
+from .session_update import SessionUpdateEvent
