@@ -1,4 +1,4 @@
-from asyncio import Event, TaskGroup, gather
+from asyncio import Event, TaskGroup, gather, sleep, timeout
 from dataclasses import dataclass, field
 from string import Template as TemplateString
 
@@ -9,19 +9,21 @@ from websockets.asyncio.client import ClientConnection
 
 from callbot.auth.jwt import JWT
 from callbot.exceptions import (
+    AuthException,
     CallManagerException,
     EndCall,
     FunctionEndCall,
+    SpeechStartTimeout,
     TwilioStop,
-    TwilioWebsocketDisconnect, AuthException,
+    TwilioWebsocketDisconnect,
 )
 from callbot.functions import Function
 from callbot.hooks import (
     AfterCallStartHook,
     AfterFunctionCallHook,
+    BeforeConversationStart,
     BeforeFunctionCallHook,
 )
-from callbot.hooks.before_conversation_start import BeforeConversationStart
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -34,6 +36,7 @@ from callbot.schemas.openai_rt.server_events import (  # type: ignore[attr-defin
     ErrorEvent as OpenAIRTErrorEvent,
     InputAudioBufferSpeechStartedEvent as OpenAIRTInputAudioBufferSpeechStartedEvent,
     ResponseAudioDeltaEvent as OpenAIRTResponseAudioDeltaEvent,
+    ResponseAudioDoneEvent as OpenAIRTResponseAudioDoneEvent,
     ResponseDoneEvent as OpenAIRTResponseDoneEvent,
     ServerEvent as OpenAIRTServerEvent,
 )
@@ -61,6 +64,7 @@ class CallManager:
     contact_info_ready: Event = field(default_factory=Event, init=False)
     stream_sid: str = ""
     call_sid: str = ""
+    conversation_ongoing: Event = field(default_factory=Event, init=False)
     latest_media_timestamp: int = 0
     last_assistant_item: str | None = None
     mark_queue: list[str] = field(default_factory=list)
@@ -94,6 +98,7 @@ class CallManager:
                 task_group.create_task(self.openai_start_conversation())
                 task_group.create_task(self.twilio_listen())
                 task_group.create_task(self.openai_listen())
+                task_group.create_task(self._timeout_loop())
         except* EndCall as end_call_group:
             for exception in end_call_group.exceptions:
                 self._handle_end_call(exception)
@@ -208,6 +213,17 @@ class CallManager:
                 # TODO: Handle `ConnectionClosed`.
                 await self.openai_websocket.send(audio_append)
             case TwilioInboundMark():
+                # If the last part an audio response by the bot has been played,
+                # we clear the `conversation_ongoing` event. This means, the
+                # `speech_start_timeout` clock will start ticking.
+                if message.mark.name == "done":
+                    log.debug("Bot has finished speaking")
+                    self.conversation_ongoing.clear()
+                # Conversely, if just a part of a response has been played,
+                # we keep the event set to ensure no timeout occurs, while the
+                # bot is "still speaking".
+                else:
+                    self.conversation_ongoing.set()
                 if self.mark_queue:
                     self.mark_queue.pop(0)
             case TwilioInboundStop():
@@ -255,9 +271,17 @@ class CallManager:
                         log.debug(f"Setting start timestamp for new response: {self.response_start_timestamp_twilio}ms")
                 self.last_assistant_item = event.item_id
                 await self._send_mark()
+            case OpenAIRTResponseAudioDoneEvent():
+                # We want to be notified by Twilio, when the last part of the
+                # bot's audio response has been played.
+                message = TwilioOutboundMark.with_name("done", self.stream_sid)
+                await self.twilio_websocket.send_text(message.model_dump_json())
             case OpenAIRTInputAudioBufferSpeechStartedEvent():
-                # Trigger an interruption. Alternatively `input_audio_buffer.speech_stopped` or both may work.
-                log.debug("Speech started detected.")
+                log.debug("Speech start detected.")
+                # If speech is detected, we make sure the `conversation_ongoing`
+                # event is set, so that a timeout cannot occur, while the other
+                # side is speaking.
+                self.conversation_ongoing.set()
                 if self.last_assistant_item:
                     log.debug(f"Interrupting response with id: {self.last_assistant_item}")
                     await self._handle_speech_started_event()
@@ -310,3 +334,16 @@ class CallManager:
         message = TwilioOutboundMark.with_name(mark, self.stream_sid)
         await self.twilio_websocket.send_text(message.model_dump_json())
         self.mark_queue.append(mark)
+
+    async def _timeout_loop(self) -> None:
+        settings = Settings()
+        while True:
+            seconds = settings.misc.speech_start_timeout
+            try:
+                async with timeout(seconds):
+                    await gather(
+                        sleep(1),  # Wait at least a second in each iteration.
+                        self.conversation_ongoing.wait(),
+                    )
+            except TimeoutError as e:
+                raise SpeechStartTimeout(seconds) from e

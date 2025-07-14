@@ -46,6 +46,11 @@ class FunctionEndCall(EndCall):
         )
 
 
+class SpeechStartTimeout(EndCall):
+    def __init__(self, seconds: float) -> None:
+        super().__init__(f"Speech has not started after {seconds} seconds.")
+
+
 class AuthException(HTTPException, CallbotException):
     def __init__(
         self,

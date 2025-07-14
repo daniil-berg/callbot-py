@@ -52,6 +52,7 @@ NoneAsEmptyList = BeforeValidator(lambda v: [] if v is None else v)
 NoneAsEmptyDict = BeforeValidator(lambda v: {} if v is None else v)
 
 DBURLQuery = Annotated[dict[str, list[str] | str], NoneAsEmptyDict]
+Float1orGreater = Annotated[float, Ge(1.0)]
 FloatOpenAISpeed = Annotated[float, Ge(0.25), Le(1.5)]
 FloatOpenAITemperature = Annotated[float, Ge(0.6), Le(1.2)]
 IntLogLevel = Annotated[PositiveInt, Le(CRITICAL), WrapValidator(log_level_num)]

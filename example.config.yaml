@@ -112,3 +112,8 @@ misc:
 
   # If provided, phone numbers not in international format can be converted to that format assuming this region code.
   default_phone_region:
+
+  # Number of (consecutive) seconds of silence to allow, before the call is ended with a timeout error.
+  # Refers specifically to the time between the completion of a model response and the start of the person's speech.
+  # Setting this to `null` (or no value) disables the feature; this means a timeout will never occur.
+  speech_start_timeout: 10
