@@ -1,6 +1,7 @@
 from asyncio import Event, TaskGroup, gather, sleep, timeout
 from dataclasses import dataclass, field
 from string import Template as TemplateString
+from typing import cast
 
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException, status
 from loguru import logger as log
@@ -19,6 +20,7 @@ from callbot.exceptions import (
 )
 from callbot.functions import Function
 from callbot.hooks import (
+    AfterCallEndHook,
     AfterCallStartHook,
     AfterFunctionCallHook,
     BeforeConversationStart,
@@ -93,16 +95,31 @@ class CallManager:
         If an initial conversation prompt is configured, the model is prompted
         to start the conversation.
         """
+        exceptions: ExceptionGroup | None = None
         try:
             async with TaskGroup() as task_group:
                 task_group.create_task(self.openai_start_conversation())
                 task_group.create_task(self.twilio_listen())
                 task_group.create_task(self.openai_listen())
                 task_group.create_task(self._timeout_loop())
-        except* EndCall as end_call_group:
+        except* Exception as exc:
+            exceptions = exc
+            self._handle_run_exception(exc)
+        finally:
+            await self.twilio_websocket.close()
+            await self.openai_websocket.close()
+            await AfterCallEndHook(self, exceptions).dispatch()
+
+    @classmethod
+    def _handle_run_exception(cls, exc: ExceptionGroup) -> None:
+        end_call_group, rest = exc.split(EndCall)
+        if end_call_group:
             for exception in end_call_group.exceptions:
-                self._handle_end_call(exception)
-        except* AuthException as auth_exception_group:
+                cls._handle_end_call(exception)
+        if rest is None:
+            return
+        auth_exception_group, rest = rest.split(AuthException)
+        if auth_exception_group:
             # The Twilio listener is the only possible `AuthException` source.
             assert len(auth_exception_group.exceptions) == 1
             auth_exception = auth_exception_group.exceptions[0]
@@ -113,11 +130,8 @@ class CallManager:
                 code=status.WS_1008_POLICY_VIOLATION,
                 reason=auth_exception.detail,
             ) from auth_exception
-        except* Exception as exc:
-            log.exception(f"Unexpected exceptions in call: {exc}")
-        finally:
-            await self.twilio_websocket.close()
-            await self.openai_websocket.close()
+        if rest:
+            log.exception(f"Unexpected exceptions in call: {rest}")
 
     @staticmethod
     def _handle_end_call(exc: EndCall | ExceptionGroup[EndCall]) -> None:
@@ -346,4 +360,4 @@ class CallManager:
                         self.conversation_ongoing.wait(),
                     )
             except TimeoutError as e:
-                raise SpeechStartTimeout(seconds) from e
+                raise SpeechStartTimeout(cast(float, seconds)) from e

@@ -12,3 +12,4 @@ if TYPE_CHECKING:
 @dataclass
 class AfterCallEndHook(Hook):
     call_manager: CallManager
+    exceptions: ExceptionGroup | None
