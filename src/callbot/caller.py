@@ -64,6 +64,7 @@ class Caller:
             to=contact.phone,
             from_=settings.twilio.phone_number,
             machine_detection="Enable",
+            timeout=settings.twilio.timeout,
             twiml=twiml,
         )
         if not isinstance(call_instance.sid, str):

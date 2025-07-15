@@ -12,4 +12,4 @@ class TwilioSettings(SettingsSection):
     account_sid: StrNoneAsEmpty = ""
     auth_token: SecretStrNoneAsEmpty = SecretStr("")
     phone_number: StrPhone | None = None
-    max_parallel_calls: PositiveInt = 1
+    timeout: PositiveInt = 60

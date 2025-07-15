@@ -36,13 +36,19 @@ db:
 
 # Settings related to the Twilio account.
 twilio:
+
   # SID of the account to use.
   account_sid:
+
   # API authentication token to provide to Twilio.
   auth_token:
+
   # Phone number to use for outbound calls.
   # Must be in the E.164 format AND enclosed in quotes!
   phone_number:
+
+  # Number of seconds the phone is allowed to ring before assuming there is no answer and hanging up.
+  timeout: 60
 
 # Settings related to the OpenAI realtime API.
 openai:
