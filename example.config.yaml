@@ -89,6 +89,13 @@ openai:
     # Sampling temperature for the model. Must be between 0.6 and 1.2.
     temperature: 0.8
 
+    # Controls the way that automatic voice activity detection in the Realtime API is handled.
+    # For details see: https://platform.openai.com/docs/guides/realtime-vad
+    turn_detection:
+
+      # Can be either `semantic_vad` or `server_vad`.
+      type: semantic_vad
+
     # Voice the model shall use to respond.
     # Options: "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"
     voice:
