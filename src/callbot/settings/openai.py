@@ -49,7 +49,7 @@ class SessionSettings(SettingsSection, Session):
     speed: FloatOpenAISpeed = 1.0
     temperature: FloatOpenAITemperature = 0.8
     turn_detection: SessionTurnDetection | None = SessionTurnDetection(
-        type="semantic_vad",
+        type="server_vad",
     )
 
     def model_post_init(self, context: Any, /) -> None:

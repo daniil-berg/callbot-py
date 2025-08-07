@@ -94,7 +94,7 @@ openai:
     turn_detection:
 
       # Can be either `semantic_vad` or `server_vad`.
-      type: semantic_vad
+      type: server_vad
 
     # Voice the model shall use to respond.
     # Options: "alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"
