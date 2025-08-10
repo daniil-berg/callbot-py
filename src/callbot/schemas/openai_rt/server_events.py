@@ -3,6 +3,9 @@ from typing import Annotated, TypeAlias, Union, Literal
 from openai.types.beta.realtime.conversation_item import ConversationItem as _ConversationItem
 from openai.types.beta.realtime.conversation_item_content import ConversationItemContent as _ConversationItemContent
 from openai.types.beta.realtime.conversation_item_created_event import ConversationItemCreatedEvent as _ConversationItemCreatedEvent
+from openai.types.beta.realtime.conversation_item_input_audio_transcription_completed_event import ConversationItemInputAudioTranscriptionCompletedEvent
+from openai.types.beta.realtime.conversation_item_input_audio_transcription_delta_event import ConversationItemInputAudioTranscriptionDeltaEvent
+from openai.types.beta.realtime.conversation_item_input_audio_transcription_failed_event import ConversationItemInputAudioTranscriptionFailedEvent
 from openai.types.beta.realtime.conversation_item_truncated_event import ConversationItemTruncatedEvent
 from openai.types.beta.realtime.error_event import ErrorEvent
 from openai.types.beta.realtime.input_audio_buffer_committed_event import InputAudioBufferCommittedEvent as _InputAudioBufferCommittedEvent
@@ -84,6 +87,9 @@ class SessionUpdatedEvent(_SessionUpdatedEvent):
 # Incomplete!
 AnyServerEvent: TypeAlias = Union[
     ConversationItemCreatedEvent,
+    ConversationItemInputAudioTranscriptionCompletedEvent,
+    ConversationItemInputAudioTranscriptionDeltaEvent,
+    ConversationItemInputAudioTranscriptionFailedEvent,
     ConversationItemTruncatedEvent,
     ErrorEvent,
     InputAudioBufferCommittedEvent,

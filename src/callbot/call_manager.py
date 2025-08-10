@@ -35,10 +35,15 @@ from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defin
     SessionUpdateEvent as OpenAIRTSessionUpdateEvent,
 )
 from callbot.schemas.openai_rt.server_events import (  # type: ignore[attr-defined]
+    ConversationItemInputAudioTranscriptionCompletedEvent as OpenAIRTConversationItemInputAudioTranscriptionCompletedEvent,
+    ConversationItemInputAudioTranscriptionDeltaEvent as OpenAIRTConversationItemInputAudioTranscriptionDeltaEvent,
     ErrorEvent as OpenAIRTErrorEvent,
+    InputAudioBufferCommittedEvent as OpenAIRTInputAudioBufferCommittedEvent,
     InputAudioBufferSpeechStartedEvent as OpenAIRTInputAudioBufferSpeechStartedEvent,
     ResponseAudioDeltaEvent as OpenAIRTResponseAudioDeltaEvent,
     ResponseAudioDoneEvent as OpenAIRTResponseAudioDoneEvent,
+    ResponseContentPartAddedEvent as OpenAIRTResponseContentPartAddedEvent,
+    ResponseContentPartDoneEvent as OpenAIRTResponseContentPartDoneEvent,
     ResponseDoneEvent as OpenAIRTResponseDoneEvent,
     ServerEvent as OpenAIRTServerEvent,
 )
@@ -72,6 +77,7 @@ class CallManager:
     mark_queue: list[str] = field(default_factory=list)
     response_start_timestamp_twilio: int | None = None
     show_timing_math: bool = False
+    transcript: dict[str, str] = field(default_factory=dict)
 
     async def openai_init_session(self) -> None:
         """
@@ -261,18 +267,43 @@ class CallManager:
             raise CallManagerException("openai_listen", e) from e
 
     async def handle_openai_event(self, text: str) -> None:
+        settings = Settings()
         try:
             event = OpenAIRTServerEvent.validate_json(text)
         except ValidationError as validation_error:
             log.error(f"OpenAI event unknown: {text}")
             log.debug(f"OpenAI validation error: {validation_error.json()}")
             return
-        if event.type in Settings().openai.log_event_types:
+        if event.type in settings.openai.log_event_types:
             log.debug(f"OpenAI event: {event.model_dump_json(exclude_defaults=True)}")
         match event:
             case OpenAIRTErrorEvent():
                 error = event.error.model_dump_json(exclude_none=True)
                 log.warning(f"OpenAI 'error' event: {error}")
+            case OpenAIRTResponseContentPartAddedEvent():
+                # Reserve a spot in the transcript log.
+                self.transcript[event.item_id] = ""
+            case OpenAIRTResponseContentPartDoneEvent():
+                if event.part.type != "audio":
+                    log.error("Response content part is not of type 'audio'")
+                elif event.item_id not in self.transcript:
+                    log.error("No item ID for response transcription")
+                else:
+                    transcript = f'Callbot: "{event.part.transcript}"'
+                    self.transcript[event.item_id] = transcript
+                    if settings.logging.transcript:
+                        log.info(transcript)
+            case OpenAIRTInputAudioBufferCommittedEvent():
+                # Reserve a spot in the transcript log.
+                self.transcript[event.item_id] = ""
+            case OpenAIRTConversationItemInputAudioTranscriptionCompletedEvent():
+                if event.item_id not in self.transcript:
+                    log.error("No item ID for transcription")
+                else:
+                    transcript = f'Contact: "{event.transcript}"'
+                    self.transcript[event.item_id] = transcript
+                    if settings.logging.transcript:
+                        log.info(transcript)
             case OpenAIRTResponseAudioDeltaEvent():
                 twilio_media = TwilioOutboundMedia.with_payload(
                     payload=event.delta,

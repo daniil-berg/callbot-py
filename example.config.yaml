@@ -103,22 +103,24 @@ openai:
 # Logging configuration.
 logging:
 
+  # Format for log messages.
+  # See: https://loguru.readthedocs.io/en/stable/api/logger.html#record
+  # Also see: https://loguru.readthedocs.io/en/stable/api/logger.html#color
+  format: "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
+
   # Global log level.
   # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
   level: INFO
 
-  # Format for log messages.
-  # See: https://loguru.readthedocs.io/en/stable/api/logger.html#record
-  # Also see: https://loguru.readthedocs.io/en/stable/api/logger.html#color
-
-  format: "<level>{level: <8}</level> | <level>{message}</level> | <cyan>{name}</cyan>"
   # Explicit logging activation/deactivation by module name.
   # Keys should be module names; values should be booleans.
-
   modules:
     aiosqlite: false
     sqlalchemy: false
     websockets: false
+
+  # Whether to log the conversation transcript. (Level will be "INFO".)
+  transcript: true
 
 # Miscellaneous options.
 misc:

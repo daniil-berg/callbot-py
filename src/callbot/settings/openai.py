@@ -81,7 +81,6 @@ class OpenAISettings(SettingsSection):
         "input_audio_buffer.speech_started",
         "input_audio_buffer.speech_stopped",
         "rate_limits.updated",
-        "response.content.done",
         "response.done",
         "session.created",
         "session.updated",
