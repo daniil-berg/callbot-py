@@ -11,6 +11,6 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class BeforeConversationStart(Hook):
+class BeforeConversationStartHook(Hook):
     conversation_item: ConversationItem
     call_manager: CallManager
