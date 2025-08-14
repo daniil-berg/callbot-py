@@ -3,7 +3,7 @@ from logging import CRITICAL, getLevelNamesMapping
 from pathlib import Path
 from typing import Annotated, Literal, TypeAlias
 
-from annotated_types import Ge, Le
+from annotated_types import Ge, Le, MaxLen, MinLen, Predicate
 from pydantic import (
     BeforeValidator,
     PlainSerializer,
@@ -47,6 +47,10 @@ def shorten_string(max_length: int) -> Callable[[str], str]:
     return inner
 
 
+def starts_with_ac(v: str) -> bool:
+    return v.startswith("AC")
+
+
 NoneAsEmptyStr = BeforeValidator(lambda v: "" if v is None else v)
 NoneAsEmptyList = BeforeValidator(lambda v: [] if v is None else v)
 NoneAsEmptyDict = BeforeValidator(lambda v: {} if v is None else v)
@@ -87,3 +91,9 @@ Str128 = Annotated[str, PlainSerializer(shorten_string(128))]
 StrPhone = Annotated[str, PhoneNumberValidator(number_format="E164")]
 StrNoneAsEmpty = Annotated[str, NoneAsEmptyStr]
 SecretStrNoneAsEmpty = Annotated[SecretStr, NoneAsEmptyStr]
+TwilioAccountSID = Annotated[
+    str,
+    MaxLen(34),
+    MinLen(34),
+    Predicate(starts_with_ac),
+]
