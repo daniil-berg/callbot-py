@@ -1,7 +1,7 @@
-from asyncio import Event, TaskGroup, gather, sleep, timeout
+from asyncio import Event, Queue, TaskGroup, gather, sleep, timeout
 from dataclasses import dataclass, field
 from string import Template as TemplateString
-from typing import cast
+from typing import ClassVar, Self, cast
 
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException, status
 from loguru import logger as log
@@ -10,8 +10,10 @@ from websockets.asyncio.client import ClientConnection
 
 from callbot.auth.jwt import JWT
 from callbot.exceptions import (
+    AnsweringMachineDetected,
     AuthException,
     CallManagerException,
+    CallbotException,
     EndCall,
     FunctionEndCall,
     SpeechStartTimeout,
@@ -26,6 +28,7 @@ from callbot.hooks import (
     BeforeConversationStartHook,
     BeforeFunctionCallHook,
 )
+from callbot.schemas.amd_status import AMDStatus
 from callbot.schemas.contact import Contact
 from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defined]
     ConversationItemCreateEvent as OpenAIRTConversationItemCreateEvent,
@@ -65,6 +68,8 @@ from callbot.settings import Settings
 
 @dataclass
 class CallManager:
+    _active_instances: ClassVar[dict[str, Self]] = {}
+
     twilio_websocket: WebSocket
     openai_websocket: ClientConnection
     contact_info: Contact | None = field(default=None, init=False)
@@ -78,6 +83,15 @@ class CallManager:
     response_start_timestamp_twilio: int | None = None
     show_timing_math: bool = False
     transcript: dict[str, str] = field(default_factory=dict)
+
+    _abort_exception: Queue[CallbotException] = field(
+        default_factory=lambda: Queue(maxsize=1),
+        init=False,
+    )
+
+    @classmethod
+    def get(cls, call_sid: str) -> Self | None:
+        return cls._active_instances.get(call_sid)
 
     async def openai_init_session(self) -> None:
         """
@@ -108,6 +122,7 @@ class CallManager:
                 task_group.create_task(self.twilio_listen())
                 task_group.create_task(self.openai_listen())
                 task_group.create_task(self._timeout_loop())
+                task_group.create_task(self._abort_wait())
         except* Exception as exc:
             exceptions = exc
             self._handle_run_exception(exc)
@@ -115,6 +130,7 @@ class CallManager:
             await self.twilio_websocket.close()
             await self.openai_websocket.close()
             await AfterCallEndHook(self, exceptions).dispatch()
+            self._active_instances.pop(self.call_sid, None)
 
     @classmethod
     def _handle_run_exception(cls, exc: ExceptionGroup) -> None:
@@ -143,7 +159,7 @@ class CallManager:
     def _handle_end_call(exc: EndCall | ExceptionGroup[EndCall]) -> None:
         msg = f"Call ended. {exc}"
         match exc:
-            case FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
+            case AnsweringMachineDetected() | FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
                 log.info(msg)
             case CallManagerException():
                 log.exception(msg)
@@ -216,6 +232,7 @@ class CallManager:
                 log.info(f"🔐 Connection secure")
                 self.stream_sid = message.start.streamSid
                 self.call_sid = message.start.callSid
+                self._active_instances[self.call_sid] = self
                 self.contact_info = Contact.model_validate(
                     message.start.customParameters
                 )
@@ -392,3 +409,16 @@ class CallManager:
                     )
             except TimeoutError as e:
                 raise SpeechStartTimeout(cast(float, seconds)) from e
+
+    async def _abort_wait(self) -> None:
+        exception = await self._abort_exception.get()
+        raise exception
+
+    def _abort(self, exception: CallbotException) -> None:
+        self._abort_exception.put_nowait(exception)
+
+    def answering_machine_detected(self, amd_status: AMDStatus) -> None:
+        self._abort(AnsweringMachineDetected(
+            answered_by=amd_status.answered_by,
+            time=amd_status.machine_detection_duration * 1000,
+        ))

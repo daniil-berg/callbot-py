@@ -2,7 +2,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, WebSocket, status
+from fastapi import Depends, FastAPI, Form, Request, WebSocket, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from loguru import logger as log
 # TODO: Migrate to httpx-ws
@@ -13,6 +15,7 @@ from callbot.call_manager import CallManager
 from callbot.caller import Caller
 from callbot.db import EngineWrapper as DBEngine, Session
 from callbot.hooks import BeforeStartupHook
+from callbot.schemas.amd_status import AMDStatus
 from callbot.schemas.contact import Contact, Phone
 from callbot.settings import Settings
 from callbot.types import StrDict
@@ -56,6 +59,32 @@ async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
         await call_manager.run()
 
 
+@app.post("/amdstatus")
+async def amd_callback(amd_status: Annotated[AMDStatus, Form()]) -> StrDict:
+    settings = Settings()
+    if amd_status.account_sid != settings.twilio.account_sid:
+        log.error(
+            "Possible security breach! Account SID in Twilio AMD status "
+            "callback does not match configured SID!"
+        )
+        return {"status": "error", "message": "Invalid account SID"}
+    call_sid = amd_status.call_sid
+    call_manager = CallManager.get(call_sid)
+    if call_manager is None:
+        log.warning(
+            f"No active call matches incoming Twilio AMD status SID: {call_sid}"
+        )
+        return {"status": "error", "message": "No active call with this SID"}
+    match amd_status.answered_by:
+        case "human":
+            log.info(f"Twilio AMD detected human in call {call_sid}")
+        case "unknown":
+            log.warning(f"Twilio AMD status unknown for call {call_sid}")
+        case _:
+            call_manager.answering_machine_detected(amd_status)
+    return {"status": "ok"}
+
+
 @app.post(
     "/call/{phone_number}",
     dependencies=[JWTDep],
@@ -84,3 +113,20 @@ async def add_contact(contact: Contact, session: SessionDep) -> Contact:
     await session.commit()
     await session.refresh(contact_db)
     return Contact.model_validate(contact_db)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    error_str = ""
+    if client := request.client:
+        error_str += f"{client.host}:{client.port} - "
+    error_str += f'"{request.method} {request.url.path}"'
+    error_str += f": {exc}"
+    log.error(error_str)
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
+    )

@@ -18,14 +18,16 @@ E = TypeVar("E", bound=BaseException)
 
 class Caller:
     twilio_client: Client
-    endpoint: URL
+    amd_status_url: URL
+    stream_url: URL
 
     def __init__(self, *, pool: bool = True) -> None:
         settings = Settings()
         if settings.server.public_base_url is None:
             raise RuntimeError("Missing public base URL")
         public_base_url = URL(str(settings.server.public_base_url))
-        self.endpoint = public_base_url.replace(scheme="wss", path="/stream")
+        self.stream_url = public_base_url.replace(scheme="wss", path="/stream")
+        self.amd_status_url = public_base_url.replace(path="/amdstatus")
         self.twilio_client = Client(
             settings.twilio.account_sid,
             settings.twilio.auth_token.get_secret_value(),
@@ -52,19 +54,20 @@ class Caller:
             raise RuntimeError("Missing Twilio phone number")
         twiml = VoiceResponse()
         connect = Connect()
-        stream = Stream(url=str(self.endpoint))
+        stream = Stream(url=str(self.stream_url))
         for key, value in contact.model_dump(exclude_defaults=True).items():
             stream.parameter(name=key, value=str(value))
         stream.parameter(name="token", value=JWT.generate())
         connect.nest(stream)
         twiml.append(connect)
         log.info(f"Calling {contact.phone}: {contact.model_dump_json(exclude_defaults=True)}")
-        # TODO: Check https://www.twilio.com/docs/voice/answering-machine-detection
         call_instance = await self.twilio_client.calls.create_async(
             to=contact.phone,
             from_=settings.twilio.phone_number,
-            machine_detection="Enable",
             timeout=settings.twilio.timeout,
+            machine_detection="Enable",
+            async_amd=True,
+            async_amd_status_callback=str(self.amd_status_url),
             twiml=twiml,
         )
         if not isinstance(call_instance.sid, str):

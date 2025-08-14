@@ -7,6 +7,7 @@ from fastapi.exceptions import HTTPException
 
 if TYPE_CHECKING:
     from callbot.functions import Function
+    from callbot.schemas.amd_status import AnsweredBy
 
 
 __all__ = [
@@ -49,6 +50,13 @@ class FunctionEndCall(EndCall):
 class SpeechStartTimeout(EndCall):
     def __init__(self, seconds: float) -> None:
         super().__init__(f"Speech has not started after {seconds} seconds.")
+
+
+class AnsweringMachineDetected(EndCall):
+    def __init__(self, answered_by: AnsweredBy, time: float) -> None:
+        super().__init__(
+            f"Twilio detected {answered_by} after {time:.1f} seconds."
+        )
 
 
 class AuthException(HTTPException, CallbotException):
