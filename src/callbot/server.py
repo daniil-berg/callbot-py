@@ -7,8 +7,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from loguru import logger as log
-# TODO: Migrate to httpx-ws
-from websockets import connect as ws_connect
 
 from callbot.auth.jwt import JWT
 from callbot.call_manager import CallManager
@@ -43,19 +41,17 @@ async def root() -> StrDict:
 
 
 @app.websocket("/stream")
-async def connect_twilio_to_openai(twilio_ws: WebSocket) -> None:
-    """Handle WebSocket connections between Twilio and OpenAI."""
-    # TODO: The OpenAI websocket should be opened after the Twilio start message
-    #       passes authentication. The entire call manager initialization logic
-    #       needs to be reworked.
+async def conversation_stream(twilio_ws: WebSocket) -> None:
+    """Connects the Twilio websocket to the configured conversation backend."""
+    # TODO: The connection to the backend should only be opened after the Twilio
+    #       start message passes authentication. The entire call manager
+    #       initialization logic needs to be reworked.
     await twilio_ws.accept()
-    settings = Settings()
-    async with ws_connect(
-        uri=settings.openai.realtime_stream_url,
-        additional_headers=settings.openai.get_realtime_auth_headers(),
-    ) as openai_ws:
-        call_manager = CallManager(twilio_ws, openai_ws)
-        await call_manager.openai_init_session()
+    # TODO: Select desired backend.
+    #       For now the OpenAI reference backend is hard-coded here.
+    from callbot.backends import OpenAIBackend as Backend
+    async with Backend() as backend:
+        call_manager = CallManager(backend, twilio_ws)
         await call_manager.run()
 
 
