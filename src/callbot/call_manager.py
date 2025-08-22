@@ -15,6 +15,8 @@ from callbot.exceptions import (
     CallManagerException,
     CallbotException,
     EndCall,
+    EndCallError,
+    EndCallInfo,
     FunctionEndCall,
     SpeechStartTimeout,
     TwilioStop,
@@ -159,9 +161,9 @@ class CallManager:
     def _handle_end_call(exc: EndCall | ExceptionGroup[EndCall]) -> None:
         msg = f"Call ended. {exc}"
         match exc:
-            case AnsweringMachineDetected() | FunctionEndCall() | TwilioStop() | TwilioWebsocketDisconnect():
+            case EndCallInfo():
                 log.info(msg)
-            case CallManagerException():
+            case EndCallError():
                 log.exception(msg)
             case _:
                 log.warning(msg)

@@ -24,22 +24,39 @@ class EndCall(CallbotException):
     pass
 
 
-class CallManagerException(EndCall):
+class EndCallInfo(EndCall):
+    pass
+
+
+class EndCallWarning(EndCall):
+    pass
+
+
+class EndCallError(EndCall):
+    pass
+
+
+class CallManagerException(EndCallError):
     def __init__(self, method: str, exception: Exception) -> None:
         super().__init__(f"Error in {method}: {exception}")
 
 
-class TwilioStop(EndCall):
+class SpeechStartTimeout(EndCallWarning):
+    def __init__(self, seconds: float) -> None:
+        super().__init__(f"Speech has not started after {seconds} seconds.")
+
+
+class TwilioStop(EndCallInfo):
     def __init__(self) -> None:
         super().__init__("Twilio stop message received.")
 
 
-class TwilioWebsocketDisconnect(EndCall):
+class TwilioWebsocketDisconnect(EndCallInfo):
     def __init__(self) -> None:
         super().__init__("Twilio websocket disconnected.")
 
 
-class FunctionEndCall(EndCall):
+class FunctionEndCall(EndCallInfo):
     def __init__(self, function: Function[Any], detail: str) -> None:
         super().__init__(
             f"Function '{function.get_name()}' requested the call to end. "
@@ -47,12 +64,7 @@ class FunctionEndCall(EndCall):
         )
 
 
-class SpeechStartTimeout(EndCall):
-    def __init__(self, seconds: float) -> None:
-        super().__init__(f"Speech has not started after {seconds} seconds.")
-
-
-class AnsweringMachineDetected(EndCall):
+class AnsweringMachineDetected(EndCallInfo):
     def __init__(self, answered_by: AnsweredBy, time: float) -> None:
         super().__init__(
             f"Twilio detected {answered_by} after {time:.1f} seconds."
