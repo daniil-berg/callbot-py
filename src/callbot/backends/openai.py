@@ -166,15 +166,16 @@ class OpenAIBackend(Backend):
                 # Reserve a spot in the transcript log.
                 self._transcript[event.item_id] = ""
             case ResponseContentPartDoneEvent():
-                if event.part.type != "audio":
-                    log.error("Response content part is not of type 'audio'")
-                elif event.item_id not in self._transcript:
+                if event.item_id not in self._transcript:
                     log.error("No item ID for response transcription")
-                else:
+                    return
+                if event.part.type == "audio":
                     transcript = f'Callbot: "{event.part.transcript}"'
-                    self._transcript[event.item_id] = transcript
-                    if settings.logging.transcript:
-                        log.info(transcript)
+                else:
+                    transcript = f'Callbot: "{event.part.text}"'
+                self._transcript[event.item_id] = transcript
+                if settings.logging.transcript:
+                    log.info(transcript)
             case InputAudioBufferCommittedEvent():
                 # Reserve a spot in the transcript log.
                 self._transcript[event.item_id] = ""
