@@ -22,6 +22,7 @@ from callbot.schemas.openai_rt.client_events import (  # type: ignore[attr-defin
     SessionUpdateEvent,
 )
 from callbot.schemas.openai_rt.server_events import (  # type: ignore[attr-defined]
+    AnyServerEvent,
     ConversationItemInputAudioTranscriptionCompletedEvent,
     ErrorEvent,
     InputAudioBufferCommittedEvent,
@@ -100,11 +101,21 @@ class OpenAIBackend(Backend):
         `handle_openai_event` for details on how each type of message is
         handled.
         """
+        settings = Settings()
         start_conversation_task = create_task(self._start_conversation())
         try:
             async for text in self._connection:
                 assert isinstance(text, str)
-                await self._handle_event(text, call_manager)
+                try:
+                    event = ServerEvent.validate_json(text)
+                except ValidationError as exc:
+                    log.error(f"OpenAI event unknown: {text}")
+                    log.debug(f"OpenAI validation error: {exc.json()}")
+                    return
+                if event.type in settings.openai.log_event_types:
+                    serialized = event.model_dump_json(exclude_defaults=True)
+                    log.debug(f"OpenAI event: {serialized}")
+                await self._handle_event(event, call_manager)
         except EndCall as e:
             raise e
         except Exception as e:
@@ -141,16 +152,12 @@ class OpenAIBackend(Backend):
             ResponseCreateEvent().default_json()
         )
 
-    async def _handle_event(self, text: str, call_manager: CallManager) -> None:
+    async def _handle_event(
+        self,
+        event: AnyServerEvent,
+        call_manager: CallManager,
+    ) -> None:
         settings = Settings()
-        try:
-            event = ServerEvent.validate_json(text)
-        except ValidationError as validation_error:
-            log.error(f"OpenAI event unknown: {text}")
-            log.debug(f"OpenAI validation error: {validation_error.json()}")
-            return
-        if event.type in settings.openai.log_event_types:
-            log.debug(f"OpenAI event: {event.model_dump_json(exclude_defaults=True)}")
         match event:
             case ErrorEvent():
                 error = event.error.model_dump_json(exclude_none=True)
