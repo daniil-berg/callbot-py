@@ -47,8 +47,8 @@ class OpenAIBackend(Backend):
     Uses the OpenAI Realtime API for direct speech-to-speech conversation.
     """
 
-    _websocket: connect
-    _connection: ClientConnection
+    _openai_websocket: connect
+    _openai_connection: ClientConnection
     _last_response_item: str | None
     _response_start_timestamp: int | None
     _transcript: dict[str, str]
@@ -56,7 +56,7 @@ class OpenAIBackend(Backend):
     def __init__(self):
         super().__init__()
         settings = Settings()
-        self._websocket = connect(
+        self._openai_websocket = connect(
             uri=settings.openai.realtime_stream_url,
             additional_headers=settings.openai.get_realtime_auth_headers(),
         )
@@ -65,8 +65,7 @@ class OpenAIBackend(Backend):
         self._transcript = {}
 
     async def __aenter__(self) -> Self:
-        """Allows usage of a client instance as an `async` context manager."""
-        self._connection = await self._websocket.__aenter__()
+        self._openai_connection = await self._openai_websocket.__aenter__()
         return self
 
     async def __aexit__[E: BaseException](
@@ -75,8 +74,7 @@ class OpenAIBackend(Backend):
         exc_val: E | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        """Exits the `async with`-block."""
-        await self._connection.__aexit__(exc_type, exc_val, exc_tb)
+        await self._openai_connection.__aexit__(exc_type, exc_val, exc_tb)
 
     async def init_session(self) -> None:
         """
@@ -89,7 +87,7 @@ class OpenAIBackend(Backend):
             session=Settings().openai.session
         )
         log.debug("Updating OpenAI session")
-        await self._connection.send(
+        await self._openai_connection.send(
             session_update.model_dump_json(exclude_none=True)
         )
 
@@ -104,7 +102,7 @@ class OpenAIBackend(Backend):
         settings = Settings()
         start_conversation_task = create_task(self._start_conversation())
         try:
-            async for text in self._connection:
+            async for text in self._openai_connection:
                 assert isinstance(text, str)
                 try:
                     event = ServerEvent.validate_json(text)
@@ -145,10 +143,10 @@ class OpenAIBackend(Backend):
         event: ConversationItemCreateEvent,
     ) -> None:
         """Sends the specified `event` followed by a `ResponseCreateEvent`."""
-        await self._connection.send(
+        await self._openai_connection.send(
             event.model_dump_json(exclude_none=True)
         )
-        await self._connection.send(
+        await self._openai_connection.send(
             ResponseCreateEvent().default_json()
         )
 
@@ -223,7 +221,7 @@ class OpenAIBackend(Backend):
                 content_index=0,
                 audio_end_ms=elapsed_time,
             ).model_dump_json(exclude_none=True)
-            await self._connection.send(conversation_item_trunc)
+            await self._openai_connection.send(conversation_item_trunc)
         await call_manager.clear_marks()
         self._last_response_item = None
         self._response_start_timestamp = None
@@ -237,7 +235,7 @@ class OpenAIBackend(Backend):
         response_create = ResponseCreateEvent().default_json()
         exc, _ = await gather(
             function(call_manager),
-            self._connection.send(response_create),
+            self._openai_connection.send(response_create),
             return_exceptions=True,
         )
         await AfterFunctionCallHook(function, call_manager, exc).dispatch()
@@ -253,7 +251,7 @@ class OpenAIBackend(Backend):
         audio_append = InputAudioBufferAppendEvent(
             audio=payload,
         ).model_dump_json(exclude_none=True)
-        await self._connection.send(audio_append)
+        await self._openai_connection.send(audio_append)
 
     def get_transcript(self) -> str:
         return "\n".join(self._transcript.values())

@@ -40,7 +40,7 @@ class Backend(ABC):
         return self._contact_info
 
     async def __aenter__(self) -> Self:
-        """Allows usage of a client instance as an `async` context manager."""
+        """Allows usage of an instance as an `async` context manager."""
         return self
 
     async def __aexit__[E: BaseException](
