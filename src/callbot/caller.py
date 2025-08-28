@@ -5,7 +5,7 @@ from fastapi.datastructures import URL
 from loguru import logger as log
 from twilio.rest import Client  # type: ignore[import-untyped]
 from twilio.http.async_http_client import AsyncTwilioHttpClient  # type: ignore[import-untyped]
-from twilio.twiml.voice_response import Connect, Stream, VoiceResponse  # type: ignore[import-untyped]
+from twilio.twiml.voice_response import Connect, ConversationRelay, Stream, VoiceResponse  # type: ignore[import-untyped]
 
 from callbot.auth.jwt import JWT
 from callbot.db import EngineWrapper as DBEngine, Session
@@ -54,11 +54,17 @@ class Caller:
             raise RuntimeError("Missing Twilio phone number")
         twiml = VoiceResponse()
         connect = Connect()
-        stream = Stream(url=str(self.stream_url))
+        nested = Stream(url=str(self.stream_url))
+        # nested = ConversationRelay(
+        #     url=str(self.stream_url),
+        #     language="de-DE",
+        #     tts_provider="Elevenlabs",
+        #     voice=settings.elevenlabs.voice_id,
+        # )
         for key, value in contact.model_dump(exclude_defaults=True).items():
-            stream.parameter(name=key, value=str(value))
-        stream.parameter(name="token", value=JWT.generate())
-        connect.nest(stream)
+            nested.parameter(name=key, value=str(value))
+        nested.parameter(name="token", value=JWT.generate())
+        connect.nest(nested)
         twiml.append(connect)
         log.info(f"Calling {contact.phone}: {contact.model_dump_json(exclude_defaults=True)}")
         call_instance = await self.twilio_client.calls.create_async(

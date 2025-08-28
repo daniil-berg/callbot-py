@@ -28,9 +28,13 @@ from callbot.schemas.amd_status import AMDStatus
 from callbot.schemas.contact import Contact
 from callbot.schemas.twilio_websocket_messages.inbound import (  # type: ignore[attr-defined]
     Connected as TwilioInboundConnected,
+    Error as TwilioInboundError,
+    Interrupt as TwilioInboundInterrupt,
     Mark as TwilioInboundMark,
     Media as TwilioInboundMedia,
     Message as TwilioInboundMessage,
+    Prompt as TwilioInboundPrompt,
+    Setup as TwilioInboundSetup,
     Start as TwilioInboundStart,
     Stop as TwilioInboundStop,
 )
@@ -38,6 +42,7 @@ from callbot.schemas.twilio_websocket_messages.outbound import (  # type: ignore
     Clear as TwilioOutboundClear,
     Mark as TwilioOutboundMark,
     Media as TwilioOutboundMedia,
+    TextTokens as TwilioOutboundTextTokens,
 )
 from callbot.settings import Settings
 
@@ -181,6 +186,38 @@ class CallManager:
                     self.mark_queue.pop(0)
             case TwilioInboundStop():
                 raise TwilioStop()
+            ##################################
+            # Conversational relay messages: #
+            case TwilioInboundSetup():
+                log.info(f"🔌 Connected to Twilio - {message}")
+                # TODO: Validate account and maybe stream SID!
+                token = message.custom_parameters.get("token", "")
+                _jwt = JWT.decode_and_invalidate(token)
+                log.info(f"🔐 Connection secure")
+                self.call_sid = message.call_sid
+                self._active_instances[self.call_sid] = self
+                self.backend.contact_info = Contact.model_validate(
+                    message.custom_parameters
+                )
+                await AfterCallStartHook(self).dispatch()
+                log.debug(f"Call has started {self.call_sid}")
+            case TwilioInboundError():
+                log.error(f"Twilio error message: {message.description}")
+            case TwilioInboundPrompt():
+                if not self.conversation_ongoing.is_set():
+                    log.debug("Speech start detected.")
+                    # If speech is detected, we make sure the `conversation_ongoing`
+                    # event is set, so that a timeout cannot occur, while the other
+                    # side is speaking.
+                    self.conversation_ongoing.set()
+                await self.backend.send_text(message.voice_prompt)
+            case TwilioInboundInterrupt():
+                log.info(f"Callbot interrupted after: {message.utterance_until_interrupt}")
+
+    async def send_text(self, text_tokens: TwilioOutboundTextTokens) -> None:
+        serialized = text_tokens.model_dump_json(exclude_none=True)
+        log.debug(f"Sending text tokens to Twilio: {serialized}")
+        await self.twilio_websocket.send_text(serialized)
 
     async def send_media(self, payload: str) -> None:
         twilio_media = TwilioOutboundMedia.with_payload(

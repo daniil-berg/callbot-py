@@ -5,6 +5,7 @@ from pydantic import TypeAdapter, Field
 from .clear import Clear
 from .mark import Mark
 from .media import Media
+from .text_tokens import TextTokens
 
 
 Message = TypeAdapter[Union[Clear, Mark, Media]](
