@@ -25,6 +25,8 @@ from openai.types.beta.realtime.response_function_call_arguments_delta_event imp
 from openai.types.beta.realtime.response_function_call_arguments_done_event import ResponseFunctionCallArgumentsDoneEvent
 from openai.types.beta.realtime.response_output_item_added_event import ResponseOutputItemAddedEvent as _ResponseOutputItemAddedEvent
 from openai.types.beta.realtime.response_output_item_done_event import ResponseOutputItemDoneEvent as _ResponseOutputItemDoneEvent
+from openai.types.beta.realtime.response_text_done_event import ResponseTextDoneEvent
+from openai.types.beta.realtime.response_text_delta_event import ResponseTextDeltaEvent
 from openai.types.beta.realtime.session import Session as _Session
 from openai.types.beta.realtime.session_created_event import SessionCreatedEvent
 from openai.types.beta.realtime.session_updated_event import SessionUpdatedEvent as _SessionUpdatedEvent
@@ -108,6 +110,8 @@ AnyServerEvent: TypeAlias = Union[
     ResponseFunctionCallArgumentsDoneEvent,
     ResponseOutputItemAddedEvent,
     ResponseOutputItemDoneEvent,
+    ResponseTextDeltaEvent,
+    ResponseTextDoneEvent,
     SessionCreatedEvent,
     SessionUpdatedEvent,
 ]

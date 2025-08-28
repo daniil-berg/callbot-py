@@ -36,7 +36,6 @@ class SessionSettings(SettingsSection, Session):
     input_audio_format: Literal["g711_ulaw"] = "g711_ulaw"
     instructions: Str128 | None = None
     instructions_file: PathFileExists | None = None
-    modalities: tuple[Literal["audio"], Literal["text"]] = ("audio", "text")
     model: Literal[
         "gpt-4o-mini-realtime-preview",
         "gpt-4o-mini-realtime-preview-2024-12-17",

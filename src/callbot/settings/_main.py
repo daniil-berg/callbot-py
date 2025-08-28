@@ -12,6 +12,7 @@ from pydantic_settings import (
 from callbot.misc.singleton import Singleton
 from callbot.settings._section import SettingsSection
 from callbot.settings.db import DBSettings
+from callbot.settings.elevenlabs import ElevenlabsSettings
 from callbot.settings.logging import LoggingSettings
 from callbot.settings.misc import MiscSettings
 from callbot.settings.openai import OpenAISettings
@@ -38,6 +39,7 @@ class Settings(
     db: DBSettings = DBSettings()
     twilio: TwilioSettings = TwilioSettings()
     openai: OpenAISettings = OpenAISettings()
+    elevenlabs: ElevenlabsSettings = ElevenlabsSettings()
     logging: LoggingSettings = LoggingSettings()
     misc: MiscSettings = MiscSettings()
     # TODO: This is dumped without applying serialization rules.

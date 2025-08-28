@@ -73,5 +73,9 @@ class Backend(ABC):
         ...
 
     @abstractmethod
+    async def send_text(self, payload: str) -> None:
+        ...
+
+    @abstractmethod
     def get_transcript(self) -> str:
         ...

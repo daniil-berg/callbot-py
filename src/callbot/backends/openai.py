@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from asyncio import create_task, gather
+from asyncio import create_task, gather, CancelledError
 from string import Template
 from types import TracebackType
 from typing import Self, TYPE_CHECKING
@@ -114,12 +114,15 @@ class OpenAIBackend(Backend):
                     serialized = event.model_dump_json(exclude_defaults=True)
                     log.debug(f"OpenAI event: {serialized}")
                 await self._handle_event(event, call_manager)
+        except CancelledError:
+            log.debug("Cancelled OpenAIBackend.listen")
         except EndCall as e:
             raise e
         except Exception as e:
             raise CallManagerException("OpenAIBackend.listen", e) from e
         finally:
             await start_conversation_task
+            log.debug("OpenAIBackend.listen end")
 
     async def _start_conversation(self) -> None:
         """
@@ -137,15 +140,16 @@ class OpenAIBackend(Backend):
         prompt = template.safe_substitute(contact.model_dump())
         event = ConversationItemCreateEvent.with_user_prompt(prompt)
         await self._send_conversation_item(event)
+        log.debug("OpenAIBackend._start_conversation end")
 
     async def _send_conversation_item(
         self,
         event: ConversationItemCreateEvent,
     ) -> None:
         """Sends the specified `event` followed by a `ResponseCreateEvent`."""
-        await self._openai_connection.send(
-            event.model_dump_json(exclude_none=True)
-        )
+        serialized = event.model_dump_json(exclude_none=True)
+        log.debug(f"Creating OpenAI conversation item: {serialized}")
+        await self._openai_connection.send(serialized)
         await self._openai_connection.send(
             ResponseCreateEvent().default_json()
         )
@@ -252,6 +256,10 @@ class OpenAIBackend(Backend):
             audio=payload,
         ).model_dump_json(exclude_none=True)
         await self._openai_connection.send(audio_append)
+
+    async def send_text(self, payload: str) -> None:
+        event = ConversationItemCreateEvent.with_user_prompt(payload)
+        await self._send_conversation_item(event)
 
     def get_transcript(self) -> str:
         return "\n".join(self._transcript.values())
