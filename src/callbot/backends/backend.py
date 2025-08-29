@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from asyncio import Event
+from importlib.metadata import entry_points
 from types import TracebackType
-from typing import Self, TYPE_CHECKING
+from typing import ClassVar, Self, TYPE_CHECKING
+
+from loguru import logger as log
 
 from callbot.schemas.contact import Contact
 
@@ -17,9 +20,37 @@ class Backend(ABC):
 
     Instantiated per call, just like the `CallManager`.
     """
+    _available_backends: ClassVar[dict[str, type[Self]]] = {}
 
     _contact_info: Contact | None
     _contact_info_ready: Event
+
+    @classmethod
+    def load_backends(cls):
+        from callbot.backends import OpenAIBackend, OpenAIElevenLabsBackend
+        cls._available_backends["openai"] = OpenAIBackend
+        cls._available_backends["openai_elevenlabs"] = OpenAIElevenLabsBackend
+        group = entry_points(group="callbot.backends")
+        for plugin in group:
+            backend_cls = plugin.load()
+            if not issubclass(backend_cls, Backend):
+                log.error(f"Not a a callbot backend classs: '{plugin.value}'")
+                continue
+            existing_backend = cls._available_backends.get(plugin.name)
+            if existing_backend is not None:
+                log.warning(
+                    f"Callbot backend with named {plugin.name} already loaded "
+                    f"({existing_backend.__name__}). Ignoring '{plugin.value}'"
+                )
+                continue
+            cls._available_backends[plugin.name] = backend_cls
+        log.debug(f"Available backends: {list(cls._available_backends.keys())}")
+
+    @classmethod
+    def get(cls, name: str) -> type[Self] | None:
+        if not cls._available_backends:
+            cls.load_backends()
+        return cls._available_backends.get(name)
 
     def __init__(self):
         self._contact_info = None

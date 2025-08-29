@@ -39,6 +39,7 @@ dependencies = [
     "aiosqlite",
     "annotated-types",
     "caseutil",
+    "elevenlabs",
     "email-validator",
     "fastapi[standard]",
     "loguru",

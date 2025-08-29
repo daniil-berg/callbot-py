@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, Response
 from loguru import logger as log
 
 from callbot.auth.jwt import JWT
+from callbot.backends import Backend
 from callbot.call_manager import CallManager
 from callbot.caller import Caller
 from callbot.db import EngineWrapper as DBEngine, Session
@@ -43,14 +44,16 @@ async def root() -> StrDict:
 @app.websocket("/stream")
 async def conversation_stream(twilio_ws: WebSocket) -> None:
     """Connects the Twilio websocket to the configured conversation backend."""
+    settings = Settings()
     # TODO: The connection to the backend should only be opened after the Twilio
     #       start message passes authentication. The entire call manager
     #       initialization logic needs to be reworked.
     await twilio_ws.accept()
-    # TODO: Select desired backend.
-    #       For now the OpenAI reference backend is hard-coded here.
-    from callbot.backends import OpenAIBackend as Backend
-    async with Backend() as backend:
+    backend_cls = Backend.get(settings.backend)
+    if backend_cls is None:
+        log.error(f"Backend '{settings.backend}' not available!")
+    log.debug(f"Using '{settings.backend}' backend")
+    async with backend_cls() as backend:
         call_manager = CallManager(backend, twilio_ws)
         await call_manager.run()
 

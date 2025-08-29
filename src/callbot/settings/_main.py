@@ -35,6 +35,7 @@ class Settings(
         yaml_file="config.yaml",
     )
 
+    backend: str = "openai"
     server: ServerSettings = ServerSettings()
     db: DBSettings = DBSettings()
     twilio: TwilioSettings = TwilioSettings()

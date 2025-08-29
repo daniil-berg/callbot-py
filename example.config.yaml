@@ -1,3 +1,7 @@
+# Selected conversational backend.
+# Plugins may provide their own backend implementation.
+backend: openai
+
 # Server related settings.
 server:
 
